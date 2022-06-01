@@ -1,7 +1,9 @@
 url: 127.0.0.1:8888
 topics:
   [
-    /camera/color/image_raw,
+    /hesai/pandar_points,
+    # /camera/color/image_raw,
+    # /camera/color/camera_info,
     # /camera/aligned_depth_to_color/image_raw,
   ]
   # /plan:
