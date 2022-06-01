@@ -1,0 +1,12 @@
+url: 127.0.0.1:8888
+topics:
+  [
+    /camera/color/image_raw,
+    # /camera/aligned_depth_to_color/image_raw,
+  ]
+  # /plan:
+  #   type: nav_msgs.msg.Path
+  # /imu/data:
+  #   type: sensor_msgs.msg.Imu
+  # /fix:
+  #   type: sensor_msgs.msg.NavSatFix
