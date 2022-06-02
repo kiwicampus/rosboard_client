@@ -8,16 +8,11 @@ Code Information:
 """
 
 # =============================================================================
-import imp
 import os
-from re import M
 import time
-from turtle import pu
-from traitlets import default
 import yaml
 import json
 import rclpy
-from ament_index_python.packages import get_package_share_directory
 import threading
 from rclpy.node import Node
 
