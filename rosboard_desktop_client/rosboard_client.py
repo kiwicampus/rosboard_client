@@ -15,6 +15,7 @@ import json
 import rclpy
 import threading
 from rclpy.node import Node
+import logging
 
 from twisted.internet import reactor
 from python_utils.profilers import profile
@@ -57,45 +58,84 @@ class WebsocketV1Transport:
     PONG_TIME = "t"
 
 
-class ImagePublisher:
-    def __init__(self, parent_node: Node, topic_name: str, **kwargs) -> None:
+class GenericPublisher:
+    def __init__(
+        self,
+        parent_node: Node,
+        topic_name: str,
+        topic_class_name: str,
+    ) -> None:
+        self.topic_class_name = topic_class_name
         self.parent_node = parent_node
-        self.publisher = parent_node.create_publisher(Image, topic_name, 1)
+        if parent_node is None:
+            self.publisher = None
+            self.logger = logging.getLogger("rosboard_client")
+            self.logger.warning(
+                f"No parent node was provided. Will not be able to publish messages on topic {topic_name}"
+            )
+            return
+        try:
+            self.topic_class = eval(topic_class_name.replace("/", "."))
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(f"Could not import {topic_class_name}")
+        self.publisher = parent_node.create_publisher(
+            msg_type=self.topic_class, topic=topic_name, qos_profile=1
+        )
+        self.logger = parent_node.get_logger()
+
+    def publish(self, msg: any):
+        if not isinstance(msg, self.topic_class):
+            self.logger.error(
+                f"tried to publish a message of type {type(msg).__name__} while a publisher was created for type {self.topic_class_name}"
+            )
+            return
+        if self.publisher is None:
+            self.logger.error(f"tried to publish message but no node was provided")
+            return
+        self.publisher.publish(msg)
+
+    def parse_and_publish(self, rosboard_data):
+        self.publish(self.parse_message(rosboard_data))
+
+    def parse_message(self, rosboard_data):
+        rosboard_dict = rosboard_data[1]
+        message = convert_dictionary_to_ros_message(
+            self.topic_class_name.replace(".", "/"), rosboard_data[1], strict_mode=False
+        )
+        return message
+        # self.publisher.publish(msg)
+
+
+class ImagePublisher(GenericPublisher):
+    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+        super().__init__(parent_node, topic_name, "sensor_msgs.msg.Image")
         self.bridge = CvBridge()
 
-    def publish(self, data: dict):
+    def parse_message(self, rosboard_data):
         # print(data)
         image_bytes = simplejpeg.decode_jpeg(
-            base64.b64decode(data[1]["_data_jpeg"]), colorspace="bgr"
+            base64.b64decode(rosboard_data[1]["_data_jpeg"]), colorspace="bgr"
         )
-        image = convert_dictionary_to_ros_message(
-            "sensor_msgs/msg/Image", data[1], strict_mode=False
+        base_image = convert_dictionary_to_ros_message(
+            "sensor_msgs/msg/Image", rosboard_data[1], strict_mode=False
         )
-        image.encoding = "bgr8"
-        image.data = self.bridge.cv2_to_imgmsg(image_bytes, encoding="passthrough").data
-        # print(image_bytes.shape)
-        # cv2.imshow("troll", image_bytes)
-        # cv2.waitKey(1)
-        self.publisher.publish(image)
+        # image.encoding = "bgr8"
+        image = self.bridge.cv2_to_imgmsg(image_bytes, encoding="passthrough")
+        image.header = base_image.header
+        return image
 
     @classmethod
     def supported_msg_types(self):
         return ["sensor_msgs/msg/Image"]
 
 
-class PointCloudPublisher:
-    def __init__(self, parent_node: Node, topic_name: str, **kwargs) -> None:
-        self.parent_node = parent_node
-        self.publisher = parent_node.create_publisher(PointCloud2, topic_name, 1)
+class PointCloudPublisher(GenericPublisher):
+    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+        super().__init__(parent_node, topic_name, "sensor_msgs.msg.PointCloud2")
 
-    # @profile
-    def publish(self, data: dict):
-        # points are packed as uint16, so the points length is half of the raw data length
-        # Format: we are encoding all the floats as uint16 values where 0 represents the min value in the entire dataset and
-        # 65535 represents the max value in the dataset, and bounds: [...] holds information on those bounds so the
-        # client can decode back to a float
-        binary_data = base64.b64decode(data[1]["_data_uint16"]["points"])
-        xmin, xmax, ymin, ymax, zmin, zmax = data[1]["_data_uint16"]["bounds"]
+    def parse_message(self, rosboard_data):
+        binary_data = base64.b64decode(rosboard_data[1]["_data_uint16"]["points"])
+        xmin, xmax, ymin, ymax, zmin, zmax = rosboard_data[1]["_data_uint16"]["bounds"]
         points_array = np.frombuffer(binary_data, np.uint16)
         points_array = points_array.reshape(points_array.shape[0] // 3, 3).astype(
             np.float32
@@ -104,7 +144,7 @@ class PointCloudPublisher:
         points_array[:, 1] = self.scale_back_array(points_array[:, 1], ymin, ymax)
         points_array[:, 2] = self.scale_back_array(points_array[:, 2], zmin, zmax)
         base_pc_msg = convert_dictionary_to_ros_message(
-            "sensor_msgs/msg/PointCloud2", data[1], strict_mode=False
+            "sensor_msgs/msg/PointCloud2", rosboard_data[1], strict_mode=False
         )
         # xyz_pc = point_cloud2.create_cloud_xyz32(header=base_pc_msg.header, points=points_array) # -> avoided for efficiency reasons
         xyz_pc = point_cloud2.create_cloud_xyz32(header=base_pc_msg.header, points=[])
@@ -112,7 +152,7 @@ class PointCloudPublisher:
         xyz_pc.point_step = 12
         xyz_pc.row_step = xyz_pc.width * xyz_pc.point_step
         xyz_pc.data = points_array.tobytes()
-        self.publisher.publish(xyz_pc)
+        return xyz_pc
 
     def scale_back_array(self, array: np.ndarray, min_val: float, max_val: float):
         return (array / 65535.0) * (max_val - min_val) + min_val
@@ -120,21 +160,6 @@ class PointCloudPublisher:
     @classmethod
     def supported_msg_types(self):
         return ["sensor_msgs/msg/PointCloud2"]
-
-
-class GenericPublisher:
-    def __init__(self, parent_node: Node, topic_name: str, topic_type: str) -> None:
-        self.parent_node = parent_node
-        self.topic_type = topic_type
-        topic_class = eval(topic_type.replace("/", "."))
-        self.publisher = parent_node.create_publisher(topic_class, topic_name, 1)
-
-    def publish(self, data: dict):
-        # print(data)
-        message = convert_dictionary_to_ros_message(
-            self.topic_type, data[1], strict_mode=False
-        )
-        self.publisher.publish(message)
 
 
 class PublisherManager:
@@ -174,7 +199,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
 
         # Only process messages for now
         if data[0] == WebsocketV1Transport.MSG_MSG:
-            self.factory.socket_subscriptions[data[1]["_topic_name"]].publish(data)
+            self.factory.socket_subscriptions[data[1]["_topic_name"]](data)
 
         if data[0] == WebsocketV1Transport.MSG_TOPICS:
             self.factory.set_available_topics(data[1])
@@ -195,9 +220,8 @@ class RosboardClientProtocol(WebSocketClientProtocol):
 class RosboardClient(WebSocketClientFactory):
     protocol = RosboardClientProtocol
 
-    def __init__(self, host: str, connection_timeout: float, parent_node: Node):
-        self.parent_node = parent_node
-        self.logger = parent_node.get_logger()
+    def __init__(self, host: str, connection_timeout: float):
+        self.logger = logging.getLogger("rosboard_client")
 
         self.socket_subscriptions = {}
         self.available_topics = {}
@@ -231,30 +255,28 @@ class RosboardClient(WebSocketClientFactory):
 
         self.logger.info("available topics advertised by server")
 
-    def create_socket_subscription(self, topic_name: str, **kwargs):
-        topic_type = ""
-        if not self.is_topic_available(topic_name):
-            if not "type" in kwargs:
-                self.logger.warning(
-                    f"Will not to topic that is not available: {topic_name}, unable to determine type",
-                )
-                return
-            else:
-                topic_type = kwargs["type"]
-        else:
-            topic_type = self.get_topic_type(topic_name)
+    def create_socket_subscription(self, msg_type, topic, callback):
+        # topic_type = ""
+        # if not self.is_topic_available(topic):
+        #     if not "type" in kwargs:
+        #         self.logger.warning(
+        #             f"Will not to topic that is not available: {topic}, unable to determine type",
+        #         )
+        #         return
+        #     else:
+        #         topic_type = kwargs["type"]
+        # else:
+        #     topic_type = self.get_topic_type(topic)
 
-        # in case python like message types are used
-        topic_type.replace(".", "/")
-        publisher = PublisherManager.getDefaultPublisherForType(topic_type)
-        self.logger.info(f"creating {publisher.__name__} for topic {topic_name}")
-        self.socket_subscriptions[topic_name] = publisher(
-            self.parent_node, topic_name=topic_name, topic_type=topic_type
-        )
+        # # in case python like message types are used
+        # topic_type.replace(".", "/")
+        # publisher = PublisherManager.getDefaultPublisherForType(topic_type)
+        self.logger.info(f"creating subscriber for topic {topic}")
+        self.socket_subscriptions[topic] = callback
         self._proto.send_message(
-            json.dumps(
-                [WebsocketV1Transport.MSG_SUB, {"topicName": topic_name}]
-            ).encode("utf-8"),
+            json.dumps([WebsocketV1Transport.MSG_SUB, {"topicName": topic}]).encode(
+                "utf-8"
+            ),
         )
 
     def destroy_socket_subscription(self, topic_name):
@@ -301,17 +323,23 @@ class RosboardYamlNode(Node):
         host = config_dict["url"]
         topics_to_subscribe = config_dict["topics"]
 
-        self.client = RosboardClient(host=host, connection_timeout=5, parent_node=self)
+        self.client = RosboardClient(host=host, connection_timeout=5)
 
         # time.sleep(2)
         # Subscribe to rosboard topics
         for topic in topics_to_subscribe:
-            if self.client.is_topic_available(topic):
-                self.client.create_socket_subscription(topic)
-            else:
+            if not self.client.is_topic_available(topic):
                 self.logger.warning(
-                    f"topic {topic} has not been made available by the server. Try to subscribe later"
+                    f"Will not subscribe to topic that is not available: {topic}, unable to determine type",
                 )
+                continue
+
+            topic_type = self.client.get_topic_type(topic)
+            republisher_class = PublisherManager.getDefaultPublisherForType(topic_type)
+            republisher = republisher_class(self, topic, topic_type)
+            self.client.create_socket_subscription(
+                topic_type, topic, republisher.parse_and_publish
+            )
 
 
 # =============================================================================

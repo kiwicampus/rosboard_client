@@ -1,10 +1,10 @@
 url: 127.0.0.1:8888
 topics:
   [
-    /hesai/pandar_points,
-    # /camera/color/image_raw,
-    # /camera/color/camera_info,
-    # /camera/aligned_depth_to_color/image_raw,
+    /points,
+    /camera/color/image_raw,
+    /camera/color/camera_info,
+    /camera/aligned_depth_to_color/image_raw,
   ]
   # /plan:
   #   type: nav_msgs.msg.Path
