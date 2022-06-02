@@ -58,6 +58,44 @@ class WebsocketV1Transport:
     PONG_TIME = "t"
 
 
+class RosboardDecoder:
+    jpeg_rgb_decode = lambda binary_data: simplejpeg.decode_jpeg(
+        base64.b64decode(binary_data), colorspace="bgr"
+    )
+    default_decode = lambda binary_data: base64.b64decode(binary_data)
+    decoders = {
+        "sensor_msgs/msg/Image": {"_data_jpeg": jpeg_rgb_decode},
+        "sensor_msgs/msg/CompressedImage": {"_data_jpeg": jpeg_rgb_decode},
+        "nav_msgs/msg/OccupancyGrid": {"_data_jpeg": jpeg_rgb_decode},
+        "sensor_msgs/msg/PointCloud2": {"_data_uint16.points": default_decode},
+        "sensor_msgs/msg/LaserScan": {
+            "_ranges_uint16.points": default_decode,
+            "_intensities_uint16.points": default_decode,
+        },
+    }
+
+    def decode_field(self, dictionary, key, decode_function):
+        if "." in key:
+            new_key = key[key.find(".") + 1 :]
+            old_key = key[: key.find(".")]
+            dictionary[old_key] = self.decode_field(
+                self, dictionary[old_key], new_key, decode_function
+            )
+        else:
+            dictionary[key] = decode_function(dictionary[key])
+        return dictionary
+
+    @classmethod
+    def decode_binary_fields(self, rosboard_data):
+        msg_type = rosboard_data[1]["_topic_type"]
+        if not msg_type in self.decoders.keys():
+            return rosboard_data
+
+        for field, decoder in self.decoders[msg_type].items():
+            rosboard_data[1] = self.decode_field(self, rosboard_data[1], field, decoder)
+        return rosboard_data
+
+
 class GenericPublisher:
     def __init__(
         self,
@@ -113,9 +151,8 @@ class ImagePublisher(GenericPublisher):
 
     def parse_message(self, rosboard_data):
         # print(data)
-        image_bytes = simplejpeg.decode_jpeg(
-            base64.b64decode(rosboard_data[1]["_data_jpeg"]), colorspace="bgr"
-        )
+        image_bytes = rosboard_data[1]["_data_jpeg"]
+
         base_image = convert_dictionary_to_ros_message(
             "sensor_msgs/msg/Image", rosboard_data[1], strict_mode=False
         )
@@ -134,7 +171,7 @@ class PointCloudPublisher(GenericPublisher):
         super().__init__(parent_node, topic_name, "sensor_msgs.msg.PointCloud2")
 
     def parse_message(self, rosboard_data):
-        binary_data = base64.b64decode(rosboard_data[1]["_data_uint16"]["points"])
+        binary_data = rosboard_data[1]["_data_uint16"]["points"]
         xmin, xmax, ymin, ymax, zmin, zmax = rosboard_data[1]["_data_uint16"]["bounds"]
         points_array = np.frombuffer(binary_data, np.uint16)
         points_array = points_array.reshape(points_array.shape[0] // 3, 3).astype(
@@ -199,12 +236,11 @@ class RosboardClientProtocol(WebSocketClientProtocol):
 
         # Only process messages for now
         if data[0] == WebsocketV1Transport.MSG_MSG:
+            data = RosboardDecoder.decode_binary_fields(data)
             self.factory.socket_subscriptions[data[1]["_topic_name"]](data)
-
+            # print(f"got message on topic {data[1]}")
         if data[0] == WebsocketV1Transport.MSG_TOPICS:
             self.factory.set_available_topics(data[1])
-
-        # print(f"got message on topic {data[1]['_topic_name']}")
 
     def send_message(self, payload):
         return reactor.callFromThread(
