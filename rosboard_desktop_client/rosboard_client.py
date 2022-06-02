@@ -45,6 +45,10 @@ from sensor_msgs_py import point_cloud2
 import numpy as np
 
 
+# Occupancy Grid dependencies
+import nav_msgs.msg
+
+
 class WebsocketV1Transport:
     MSG_PING = "p"
     MSG_PONG = "q"
@@ -166,6 +170,53 @@ class ImagePublisher(GenericPublisher):
         return ["sensor_msgs/msg/Image"]
 
 
+class OccupancyGridPublisher(GenericPublisher):
+    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+        super().__init__(parent_node, topic_name, "nav_msgs.msg.OccupancyGrid")
+        self.bridge = CvBridge()
+
+    def parse_message(self, rosboard_data):
+        # print(data)
+
+        image_bytes = rosboard_data[1].pop("_data_jpeg")
+        base_occupancy_grid = convert_dictionary_to_ros_message(
+            "nav_msgs/msg/OccupancyGrid", rosboard_data[1], strict_mode=False
+        )
+        # adjust resolution for rosboard subsampling
+        base_occupancy_grid.info.resolution = base_occupancy_grid.info.resolution * (
+            base_occupancy_grid.info.width / image_bytes.shape[0]
+        )
+        # adjust size for rosboard subsampling
+        base_occupancy_grid.info.width = image_bytes.shape[0]
+        base_occupancy_grid.info.height = image_bytes.shape[1]
+        occupancy_grid_array = np.ones(
+            (image_bytes.shape[0], image_bytes.shape[1]), dtype=np.int8
+        )
+        occupancy_grid_array = (
+            np.multiply(occupancy_grid_array, image_bytes[:, :, 2]) // 2
+        )
+        # occupancy_grid_array[image_bytes[:, :, 1] > 100] = -1
+
+        cv2.imshow("troll", image_bytes[:, :, 0])
+        cv2.waitKey(1)
+        cv2.imshow("troll2", image_bytes[:, :, 1])
+        cv2.waitKey(1)
+        cv2.imshow("troll3", image_bytes[:, :, 2])
+        cv2.waitKey(1)
+
+        #  all(val >= -128 and val < 128 for val in value)), \
+        base_occupancy_grid.data = (
+            occupancy_grid_array.flatten().astype(np.int8).tolist()
+        )
+        # image.encoding = "bgr8"
+        # print(base_occupancy_grid)
+        return base_occupancy_grid
+
+    @classmethod
+    def supported_msg_types(self):
+        return ["nav_msgs/msg/OccupancyGrid"]
+
+
 class PointCloudPublisher(GenericPublisher):
     def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
         super().__init__(parent_node, topic_name, "sensor_msgs.msg.PointCloud2")
@@ -200,7 +251,7 @@ class PointCloudPublisher(GenericPublisher):
 
 
 class PublisherManager:
-    available_publishers = [ImagePublisher, PointCloudPublisher]
+    available_publishers = [ImagePublisher, PointCloudPublisher, OccupancyGridPublisher]
     default_publisher = GenericPublisher
 
     @classmethod
@@ -381,7 +432,7 @@ class RosboardYamlNode(Node):
 # =============================================================================
 def main(args=None):
     """!
-    Main Functions of Local Console Node
+    Demonstration of the rosboard client using a yaml file to get topics
     """
     # Initialize ROS communications for a given context.
     rclpy.init(args=args)
