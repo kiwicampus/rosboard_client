@@ -1,7 +1,7 @@
-url: 127.0.0.1:8888
+url: localhost:8888
 topics:
   [
-    /global_costmap/costmap
+    /scan
     # /points,
     # /camera/color/image_raw,
     # /camera/color/camera_info,

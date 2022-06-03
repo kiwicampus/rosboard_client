@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # =============================================================================
 """
 Code Information:
@@ -8,6 +9,7 @@ Code Information:
 """
 
 # =============================================================================
+from math import nan
 import os
 import time
 import yaml
@@ -18,6 +20,7 @@ from rclpy.node import Node
 import logging
 
 from twisted.internet import reactor
+
 # from python_utils.profilers import profile
 
 from rclpy.executors import MultiThreadedExecutor
@@ -48,6 +51,8 @@ import numpy as np
 # Occupancy Grid dependencies
 import nav_msgs.msg
 
+import png
+
 
 class WebsocketV1Transport:
     MSG_PING = "p"
@@ -63,14 +68,18 @@ class WebsocketV1Transport:
 
 
 class RosboardDecoder:
-    jpeg_rgb_decode = lambda binary_data: simplejpeg.decode_jpeg(
+    jpeg_bgr_decode = lambda binary_data: simplejpeg.decode_jpeg(
         base64.b64decode(binary_data), colorspace="bgr"
+    )
+    png_gray_decode = lambda binary_data: cv2.imdecode(
+        np.fromstring(base64.b64decode(binary_data), dtype="uint8"),
+        cv2.IMREAD_UNCHANGED,
     )
     default_decode = lambda binary_data: base64.b64decode(binary_data)
     decoders = {
-        "sensor_msgs/msg/Image": {"_data_jpeg": jpeg_rgb_decode},
-        "sensor_msgs/msg/CompressedImage": {"_data_jpeg": jpeg_rgb_decode},
-        "nav_msgs/msg/OccupancyGrid": {"_data_jpeg": jpeg_rgb_decode},
+        "sensor_msgs/msg/Image": {"_data_jpeg": jpeg_bgr_decode},
+        "sensor_msgs/msg/CompressedImage": {"_data_jpeg": jpeg_bgr_decode},
+        "nav_msgs/msg/OccupancyGrid": {"_data_jpeg": png_gray_decode},
         "sensor_msgs/msg/PointCloud2": {"_data_uint16.points": default_decode},
         "sensor_msgs/msg/LaserScan": {
             "_ranges_uint16.points": default_decode,
@@ -140,12 +149,10 @@ class GenericPublisher:
         self.publish(self.parse_message(rosboard_data))
 
     def parse_message(self, rosboard_data):
-        rosboard_dict = rosboard_data[1]
         message = convert_dictionary_to_ros_message(
             self.topic_class_name.replace(".", "/"), rosboard_data[1], strict_mode=False
         )
         return message
-        # self.publisher.publish(msg)
 
 
 class ImagePublisher(GenericPublisher):
@@ -189,27 +196,11 @@ class OccupancyGridPublisher(GenericPublisher):
         # adjust size for rosboard subsampling
         base_occupancy_grid.info.width = image_bytes.shape[0]
         base_occupancy_grid.info.height = image_bytes.shape[1]
-        occupancy_grid_array = np.ones(
-            (image_bytes.shape[0], image_bytes.shape[1]), dtype=np.int8
-        )
-        occupancy_grid_array = (
-            np.multiply(occupancy_grid_array, image_bytes[:, :, 2]) // 2
-        )
-        # occupancy_grid_array[image_bytes[:, :, 1] > 100] = -1
+        occupancy_grid_array = image_bytes.astype(np.int8)
 
-        cv2.imshow("troll", image_bytes[:, :, 0])
-        cv2.waitKey(1)
-        cv2.imshow("troll2", image_bytes[:, :, 1])
-        cv2.waitKey(1)
-        cv2.imshow("troll3", image_bytes[:, :, 2])
-        cv2.waitKey(1)
-
-        #  all(val >= -128 and val < 128 for val in value)), \
         base_occupancy_grid.data = (
             occupancy_grid_array.flatten().astype(np.int8).tolist()
         )
-        # image.encoding = "bgr8"
-        # print(base_occupancy_grid)
         return base_occupancy_grid
 
     @classmethod
@@ -242,6 +233,7 @@ class PointCloudPublisher(GenericPublisher):
         xyz_pc.data = points_array.tobytes()
         return xyz_pc
 
+    @classmethod
     def scale_back_array(self, array: np.ndarray, min_val: float, max_val: float):
         return (array / 65535.0) * (max_val - min_val) + min_val
 
@@ -250,8 +242,52 @@ class PointCloudPublisher(GenericPublisher):
         return ["sensor_msgs/msg/PointCloud2"]
 
 
+class LaserScanPublisher(GenericPublisher):
+    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+        super().__init__(parent_node, topic_name, "sensor_msgs.msg.LaserScan")
+
+    def parse_message(self, rosboard_data):
+        binary_ranges = rosboard_data[1]["_ranges_uint16"]["points"]
+        binary_intensities = rosboard_data[1]["_intensities_uint16"]["points"]
+        rmin, rmax = rosboard_data[1]["_ranges_uint16"]["bounds"]
+        imin, imax = rosboard_data[1]["_intensities_uint16"]["bounds"]
+        # https://stackoverflow.com/questions/53971620/cant-modify-numpy-array
+        ranges_array = np.frombuffer(binary_ranges, np.uint16).astype(np.float32).copy()
+        # zero or nan points are encoded by rosboard with 65535
+        invalid_idxs = ranges_array == 65535.0
+        intensities_array = (
+            np.frombuffer(binary_intensities, np.uint16).astype(np.float32).copy()
+        )
+        ranges_array = PointCloudPublisher.scale_back_array(ranges_array, rmin, rmax)
+        intensities_array = PointCloudPublisher.scale_back_array(
+            intensities_array, imin, imax
+        )
+        ranges_array[invalid_idxs] = 0.0
+        base_laser_msg = convert_dictionary_to_ros_message(
+            "sensor_msgs/msg/LaserScan", rosboard_data[1], strict_mode=False
+        )
+        base_laser_msg.ranges = ranges_array.flatten().tolist()
+        base_laser_msg.intensities = intensities_array.flatten().tolist()
+        # xyz_pc = point_cloud2.create_cloud_xyz32(header=base_pc_msg.header, points=points_array) # -> avoided for efficiency reasons
+        # xyz_pc = point_cloud2.create_cloud_xyz32(header=base_pc_msg.header, points=[])
+        # xyz_pc.width = points_array.shape[0]
+        # xyz_pc.point_step = 12
+        # xyz_pc.row_step = xyz_pc.width * xyz_pc.point_step
+        # xyz_pc.data = points_array.tobytes()
+        return base_laser_msg
+
+    @classmethod
+    def supported_msg_types(self):
+        return ["sensor_msgs/msg/LaserScan"]
+
+
 class PublisherManager:
-    available_publishers = [ImagePublisher, PointCloudPublisher, OccupancyGridPublisher]
+    available_publishers = [
+        ImagePublisher,
+        PointCloudPublisher,
+        OccupancyGridPublisher,
+        LaserScanPublisher,
+    ]
     default_publisher = GenericPublisher
 
     @classmethod
