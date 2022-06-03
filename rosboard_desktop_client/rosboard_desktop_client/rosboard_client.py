@@ -51,8 +51,6 @@ import numpy as np
 # Occupancy Grid dependencies
 import nav_msgs.msg
 
-import png
-
 
 class WebsocketV1Transport:
     MSG_PING = "p"
