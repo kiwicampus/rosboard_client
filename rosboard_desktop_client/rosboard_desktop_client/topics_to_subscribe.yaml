@@ -1,7 +1,15 @@
-url: localhost:8888
+url: 35.223.230.227:8888
 topics:
   [
-    /scan
+    /scan,
+    /global_costmap/costmap,
+    /video_streaming/supervisors,
+    /local_costmap/costmap,
+    /processed_pointcloud,
+    /tf,
+    /fix,
+    /local_plan,
+    /plan,
     # /points,
     # /camera/color/image_raw,
     # /camera/color/camera_info,
