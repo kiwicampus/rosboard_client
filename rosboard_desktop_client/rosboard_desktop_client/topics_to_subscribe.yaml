@@ -1,10 +1,15 @@
 url: localhost:8888
 topics:
   [
-    /scan
+    /scan,
     # /points,
-    # /camera/color/image_raw,
-    # /camera/color/camera_info,
+    /video_streaming/supervisors,
+    /processed_pointcloud,
+    /plan,
+    /local_costmap/costmap,
+    /global_costmap/costmap,
+    /fix,
+    /tf,
     # /camera/aligned_depth_to_color/image_raw,
   ]
   # /plan:
