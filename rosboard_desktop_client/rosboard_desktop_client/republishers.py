@@ -104,7 +104,7 @@ class GenericPublisher:
 
 
 class ImagePublisher(GenericPublisher):
-    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+    def __init__(self, parent_node: Node, topic_name: str, *args, **kwargs) -> None:
         """!
         Class to parse ROS images from rosboard image data. Inherits from the GenericPublisher
         Refer to https://github.com/kiwicampus/rosboard/blob/main/rosboard/compression.py
@@ -140,7 +140,7 @@ class ImagePublisher(GenericPublisher):
 
 
 class OccupancyGridPublisher(GenericPublisher):
-    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+    def __init__(self, parent_node: Node, topic_name: str, *args, **kwargs) -> None:
         """!
         Class to parse ROS OccupancyGrids from rosboard data. Inherits from the GenericPublisher
         This only works with our fork, because encoding for occupancy grids was changed to PNG
@@ -186,7 +186,7 @@ class OccupancyGridPublisher(GenericPublisher):
 
 
 class PointCloudPublisher(GenericPublisher):
-    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+    def __init__(self, parent_node: Node, topic_name: str, *args, **kwargs) -> None:
         """!
         Class to parse ROS PointCloud2 from rosboard pointcloud data. Inherits from the GenericPublisher
         Keep in mind that rosboard only sends xyz data, removing all the other PointFields
@@ -254,7 +254,7 @@ class PointCloudPublisher(GenericPublisher):
 
 
 class LaserScanPublisher(GenericPublisher):
-    def __init__(self, parent_node: Node, topic_name: str, *args) -> None:
+    def __init__(self, parent_node: Node, topic_name: str, *args, **kwargs) -> None:
         """!
         Class to parse ROS LaserScans from rosboard laserscan data. Inherits from the GenericPublisher
         Refer to https://github.com/kiwicampus/rosboard/blob/main/rosboard/compression.py

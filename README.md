@@ -70,7 +70,9 @@ class RosboardClientNode(Node):
             republisher_class = PublisherManager.getDefaultPublisherForType(topic_type)
 
             # create the republisher object
-            republisher = republisher_class(parent_node=self, topic_name=topic, topic_class_name=topic_type)
+            republisher = republisher_class(
+                parent_node=self, topic_name=topic, topic_class_name=topic_type
+            )
 
             # create the subscriptions with the republisher callback
             # each time a message arrives on a topic through rosboard
