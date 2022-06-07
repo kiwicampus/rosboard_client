@@ -33,6 +33,38 @@ import numpy as np
 logging.basicConfig(level=logging.INFO)
 
 
+def jpeg_bgr_decode(binary_data: str) -> np.ndarray:
+    """!
+    Function to get a 3 channel np.ndarray image representation from a jpeg
+    base64 encoded string
+    @param binary_data (str) the base64 encoded jpeg string
+    @return np.ndarray the 3 channel RGB image data
+    """
+    return simplejpeg.decode_jpeg(base64.b64decode(binary_data), colorspace="bgr")
+
+
+def png_gray_decode(binary_data: str) -> np.ndarray:
+    """!
+    Function to get a single channel np.ndarray image representation from a png
+    base64 encoded string
+    @param binary_data (str) the base64 encoded png string
+    @return np.ndarray the single channel grayscale image data
+    """
+    return cv2.imdecode(
+        np.fromstring(base64.b64decode(binary_data), dtype="uint8"),
+        cv2.IMREAD_UNCHANGED,
+    )
+
+
+def default_decode(binary_data: str) -> bytes:
+    """!
+    Function to decode a base64 encoded string back to bytes
+    @param binary_data (str) the base64 encoded string
+    @return bytes the bytes
+    """
+    return base64.b64decode(binary_data)
+
+
 class WebsocketV1Transport:
     """!
     Class containing the identifying character for each type of rosboard message
@@ -59,19 +91,6 @@ class RosboardDecoder:
     of decoding for each message.
     """
 
-    # Function to decode jpeg encoded images
-    jpeg_bgr_decode = lambda binary_data: simplejpeg.decode_jpeg(
-        base64.b64decode(binary_data), colorspace="bgr"
-    )
-    # Function to decode png encoded, single channel images
-    png_gray_decode = lambda binary_data: cv2.imdecode(
-        np.fromstring(base64.b64decode(binary_data), dtype="uint8"),
-        cv2.IMREAD_UNCHANGED,
-    )
-    # Function to decode b64 encoded data
-    default_decode = lambda binary_data: base64.b64decode(binary_data)
-
-    # dictionary storing type of decoding to apply to each field
     decoders = {
         "sensor_msgs/msg/Image": {"_data_jpeg": jpeg_bgr_decode},
         "sensor_msgs/msg/CompressedImage": {"_data_jpeg": jpeg_bgr_decode},
@@ -205,7 +224,13 @@ class RosboardClient(WebSocketClientFactory):
         self.available_topics = {}
 
         # Create socket connection
-        socket_url = "ws://" + host + "/rosboard/v1"
+        if host.startswith("wss://") or host.startswith("ws://"):
+            socket_url = host + "/rosboard/v1"
+        else:
+            self.logger.info(
+                "websocket protocol not provided in host url. falling back to ws:// as default"
+            )
+            socket_url = "ws://" + host + "/rosboard/v1"
         WebSocketClientFactory.__init__(self, url=socket_url)
         self.logger.info(f"connecting to {socket_url}")
         self.connector = connectWS(self)
@@ -257,19 +282,19 @@ class RosboardClient(WebSocketClientFactory):
         @param topic (str) the name of the topic
         @param callback (function) the callback to execute when a message on the topic is received
         """
-        self.logger.info(f"Destroying subscriber for topic {topic}")
-        if topic in self.socket_subscriptions.keys():
+        self.logger.info(f"Destroying subscriber for topic {topic_name}")
+        if topic_name in self.socket_subscriptions.keys():
             # remove the subscription from the dictionary
-            self.socket_subscriptions.pop(topic)
+            self.socket_subscriptions.pop(topic_name)
         else:
             self.logger.warning(
                 f"No subscription had been registered for topic {topic_name}"
             )
         self._proto.send_message(
             # rosboard expects a message like this" ["u", {topicName: xxx}] to destroy the subscription
-            json.dumps([WebsocketV1Transport.MSG_UNSUB, {"topicName": topic}]).encode(
-                "utf-8"
-            ),
+            json.dumps(
+                [WebsocketV1Transport.MSG_UNSUB, {"topicName": topic_name}]
+            ).encode("utf-8"),
         )
 
     def ready(self, proto: WebSocketClientFactory) -> None:
@@ -285,6 +310,13 @@ class RosboardClient(WebSocketClientFactory):
         @param topics (dict) The dictionary containing all the topics as keys and types as values
         """
         self.available_topics = topics
+
+    def get_available_topics(self) -> list:
+        """
+        Function to get all the topics available on the server
+        @return list with the topics available on the server
+        """
+        return list(self.available_topics.keys())
 
     def is_topic_available(self, topic: str) -> bool:
         """!

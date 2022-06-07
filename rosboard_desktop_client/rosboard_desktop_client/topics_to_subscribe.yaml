@@ -1,4 +1,4 @@
-url: 35.223.230.227:8888
+url: ws://localhost:8888
 topics:
   [
     /scan,

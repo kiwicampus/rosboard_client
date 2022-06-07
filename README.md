@@ -18,6 +18,12 @@ The library also provides a set of _republishers_ meant to convert json data fro
 
 The networking module is decoupled from the ROS dependent republishers, so it can be used as a standalone package providing custom callbacks for subscriptions that handle the json payloads. The socket client decompresses and decodes all the data before passing it to the callback.
 
+An easy way of running this over the internet is using [`ngrok`](https://ngrok.com/). After setting your authtoken you can tunnel the rosboard server, usually in the 8888 port using the tcp protocol: 
+```
+ngrok tcp 8888
+```
+The url that ngrok provides can be used as host for creating the rosboard client
+
 ### ROS independent usage
 ```.py
 from rosboard_desktop_client.networking import RosboardClient

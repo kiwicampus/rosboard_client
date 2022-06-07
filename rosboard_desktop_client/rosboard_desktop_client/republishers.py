@@ -9,11 +9,7 @@ Code Information:
 """
 
 # =============================================================================
-from math import nan
-import os
-import time
-import rclpy
-import threading
+import importlib
 from rclpy.node import Node
 import logging
 
@@ -41,6 +37,7 @@ class GenericPublisher:
         @param topic_class_name (str) The type of the messages.
         Raises:
             ModuleNotFoundError: whenever a message type cannot be imported
+            ValueError: When the message type is not found within the message module
         """
         self.topic_class_name = topic_class_name
         self.parent_node = parent_node
@@ -51,16 +48,26 @@ class GenericPublisher:
                 f"No parent node was provided. Will not be able to publish messages on topic {topic_name}"
             )
             return
+
+        # dynamically import the message class
         try:
-            ros_topic_class_name = topic_class_name.replace("/", ".")
-            # get module substring. Ex: sensor_msgs.msg from sensor_msgs.msg.Image
-            module_of_message = ".".join(ros_topic_class_name.split(".")[0:2])
-            exec(f"import {module_of_message}")
-            self.topic_class = eval(ros_topic_class_name)
+            # get module substring and message type. Ex: sensor_msgs.msg, Image from sensor_msgs.msg.Image
+            msg_module, _, msg_class_name = topic_class_name.replace(
+                "/", "."
+            ).rpartition(".")
+            if not msg_module.endswith(".msg"):
+                msg_module = msg_module + ".msg"
+            self.topic_class = getattr(
+                importlib.import_module(msg_module), msg_class_name
+            )
         except ModuleNotFoundError:
             raise ModuleNotFoundError(
-                f"Could not import {ros_topic_class_name}. Is your workspace sourced?"
+                f"Could not import {topic_class_name}. Is your workspace sourced?"
             )
+        except ValueError:
+            raise ValueError(f"Invalid message type: {topic_class_name}")
+
+        # Create the message publisher
         self.publisher = parent_node.create_publisher(
             msg_type=self.topic_class, topic=topic_name, qos_profile=1
         )
