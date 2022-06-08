@@ -1,0 +1,3 @@
+[submodule "rospy_message_converter"]
+	path = rospy_message_converter
+	url = https://github.com/kiwicampus/rospy_message_converter.git

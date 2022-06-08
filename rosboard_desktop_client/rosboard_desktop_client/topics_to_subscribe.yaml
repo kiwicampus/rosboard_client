@@ -1,0 +1,20 @@
+url: ws://localhost:8888
+topics:
+  [
+    /scan,
+    # /points,
+    /video_streaming/supervisors,
+    /processed_pointcloud,
+    /plan,
+    /local_costmap/costmap,
+    /global_costmap/costmap,
+    /fix,
+    /tf,
+    # /camera/aligned_depth_to_color/image_raw,
+  ]
+  # /plan:
+  #   type: nav_msgs.msg.Path
+  # /imu/data:
+  #   type: sensor_msgs.msg.Imu
+  # /fix:
+  #   type: sensor_msgs.msg.NavSatFix
