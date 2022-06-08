@@ -11,6 +11,7 @@ Code Information:
 # =============================================================================
 import importlib
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 import logging
 
 from sensor_msgs.msg import Image, PointCloud2, LaserScan
@@ -20,6 +21,12 @@ from cv_bridge import CvBridge
 from rclpy_message_converter.message_converter import convert_dictionary_to_ros_message
 
 import numpy as np
+
+tf_static_qos = QoSProfile(
+    depth=10,
+    reliability=QoSReliabilityPolicy.RELIABLE,
+    durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+)
 
 
 class GenericPublisher:
@@ -67,11 +74,13 @@ class GenericPublisher:
         except ValueError:
             raise ValueError(f"Invalid message type: {topic_class_name}")
 
-        # Create the message publisher
-        self.publisher = parent_node.create_publisher(
-            msg_type=self.topic_class, topic=topic_name, qos_profile=1
-        )
         self.logger = parent_node.get_logger()
+
+        # Create the message publisher
+        qos_profile = tf_static_qos if topic_name == "/tf_static" else 1
+        self.publisher = parent_node.create_publisher(
+            msg_type=self.topic_class, topic=topic_name, qos_profile=qos_profile
+        )
 
     def publish(self, msg: any) -> None:
         """!
@@ -171,11 +180,11 @@ class OccupancyGridPublisher(GenericPublisher):
         )
         # adjust resolution for rosboard subsampling
         base_occupancy_grid.info.resolution = base_occupancy_grid.info.resolution * (
-            base_occupancy_grid.info.width / image_bytes.shape[0]
+            base_occupancy_grid.info.width / image_bytes.shape[1]
         )
         # adjust size for rosboard subsampling
-        base_occupancy_grid.info.width = image_bytes.shape[0]
-        base_occupancy_grid.info.height = image_bytes.shape[1]
+        base_occupancy_grid.info.width = image_bytes.shape[1]
+        base_occupancy_grid.info.height = image_bytes.shape[0]
         occupancy_grid_array = image_bytes.astype(np.int8)
 
         base_occupancy_grid.data = (
