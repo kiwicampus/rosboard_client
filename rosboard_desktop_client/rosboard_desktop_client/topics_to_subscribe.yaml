@@ -1,16 +1,22 @@
-url: ws://localhost:8888
+url: localhost:8888
 topics:
   [
     /scan,
     # /points,
-    /video_streaming/supervisors,
-    /processed_pointcloud,
+    /camera/color/image_raw,
+    /camera/depth/color/points,
     /plan,
     /local_costmap/costmap,
     /global_costmap/costmap,
     /fix,
     /tf,
+    /clock,
+    /tf_static,
     # /camera/aligned_depth_to_color/image_raw,
+  ]
+topics_to_stream:
+  [
+    /routeclient/calc_and_pub
   ]
   # /plan:
   #   type: nav_msgs.msg.Path
