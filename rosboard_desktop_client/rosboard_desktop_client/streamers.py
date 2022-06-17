@@ -59,7 +59,7 @@ class GenericStreamer:
         """
         # get topic type and qos
         topic_info = self.parent_node.get_publishers_info_by_topic(topic_name)
-        if not len(topic_info):
+        if not topic_info:
             if topic_type is None:
                 raise Exception(
                     f"topic type for topic {topic_name} was not provided and cannot get its type because it is not being published"

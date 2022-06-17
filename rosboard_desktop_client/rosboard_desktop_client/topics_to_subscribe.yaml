@@ -1,16 +1,12 @@
-url: localhost:8888
+url: ws://4.tcp.ngrok.io:11250
 topics:
   [
     /scan,
-    # /points,
-    /camera/color/image_raw,
     /camera/depth/color/points,
     /plan,
     /local_costmap/costmap,
     /global_costmap/costmap,
-    /fix,
     /tf,
-    /clock,
     /tf_static,
     # /camera/aligned_depth_to_color/image_raw,
   ]
@@ -24,3 +20,4 @@ topics_to_stream:
   #   type: sensor_msgs.msg.Imu
   # /fix:
   #   type: sensor_msgs.msg.NavSatFix
+  

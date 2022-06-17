@@ -14,6 +14,8 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy
 import logging
 
+import cv2
+
 from sensor_msgs.msg import Image, PointCloud2, LaserScan
 from nav_msgs.msg import OccupancyGrid
 from sensor_msgs_py import point_cloud2
@@ -179,16 +181,19 @@ class OccupancyGridPublisher(GenericPublisher):
             "nav_msgs/msg/OccupancyGrid", rosboard_data[1], strict_mode=False
         )
         # adjust resolution for rosboard subsampling
+        image_bytes = cv2.rotate(image_bytes, cv2.ROTATE_90_CLOCKWISE)
         base_occupancy_grid.info.resolution = base_occupancy_grid.info.resolution * (
-            base_occupancy_grid.info.width / image_bytes.shape[1]
+            base_occupancy_grid.info.width / image_bytes.shape[0]
         )
+
         # adjust size for rosboard subsampling
-        base_occupancy_grid.info.width = image_bytes.shape[1]
-        base_occupancy_grid.info.height = image_bytes.shape[0]
+        base_occupancy_grid.info.width = image_bytes.shape[0]
+        base_occupancy_grid.info.height = image_bytes.shape[1]
+
         occupancy_grid_array = image_bytes.astype(np.int8)
 
         base_occupancy_grid.data = (
-            occupancy_grid_array.flatten().astype(np.int8).tolist()
+            occupancy_grid_array.flatten("F").astype(np.int8).tolist()
         )
         return base_occupancy_grid
 
