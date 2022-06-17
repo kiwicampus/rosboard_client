@@ -297,6 +297,21 @@ class RosboardClient(WebSocketClientFactory):
             ).encode("utf-8"),
         )
 
+    def send_ros_message(self, ros_message_dict: dict) -> None:
+        """!
+        Function to send a ros message to a rosboard server. The message needs to be
+        already in a dict form. It must also contain the _topic_name and _topic_type fields
+        i.e: {_topic_name: /chatter, _topic_type: std_msgs/msg/String, _data:'Hi!'}
+        @param ros_message_dict (dict) the ros message as a dictionary. It must also contain the
+        _topic_name and _topic_type fields i.e: {_topic_name: /chatter, _topic_type: std_msgs/msg/String, _data:'Hi!'}
+        """
+        self._proto.send_message(
+            # rosboard expects a message like this" ["m", {message dictionary}] to create the subscription
+            json.dumps([WebsocketV1Transport.MSG_MSG, ros_message_dict]).encode(
+                "utf-8"
+            ),
+        )
+
     def ready(self, proto: WebSocketClientFactory) -> None:
         """!
         Function to set the protocol object in the client. This allows to send messages

@@ -18,6 +18,8 @@ from rclpy.executors import MultiThreadedExecutor
 
 from rosboard_desktop_client.republishers import PublisherManager
 
+from rosboard_desktop_client.streamers import GenericStreamer
+
 from rosboard_desktop_client.networking import RosboardClient
 
 
@@ -38,6 +40,7 @@ class RosboardYamlNode(Node):
             config_dict = yaml.safe_load(stream)
         host = config_dict["url"]
         topics_to_subscribe = config_dict["topics"]
+        topics_to_stream = config_dict["topics_to_stream"]
 
         self.client = RosboardClient(host=host, connection_timeout=5)
 
@@ -56,6 +59,10 @@ class RosboardYamlNode(Node):
                 topic_type, topic, republisher.parse_and_publish
             )
             self.logger.info(f"subscribed to {topic} of type {topic_type}")
+
+        # Subscribe to local topics
+        for topic in topics_to_stream:
+            GenericStreamer(self, self.client, topic)
 
 
 # =============================================================================
