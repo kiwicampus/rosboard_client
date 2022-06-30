@@ -186,7 +186,9 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         # In case the information received contains a ros message
         if data[0] == WebsocketV1Transport.MSG_MSG:
             data = RosboardDecoder.decode_binary_fields(data)
-            self.factory.socket_subscriptions[data[1]["_topic_name"]](data)
+            topic_name = data[1]["_topic_name"]
+            if topic_name in self.factory.socket_subscriptions:
+                self.factory.socket_subscriptions[topic_name](data)
             # print(f"got message on topic {data[1]}")
         # in case the information received contains the list of available topics
         if data[0] == WebsocketV1Transport.MSG_TOPICS:
