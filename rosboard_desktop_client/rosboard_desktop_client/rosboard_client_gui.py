@@ -10,6 +10,8 @@ Code Information:
 
 # =============================================================================
 import os
+from psutil import cpu_percent
+from time import sleep
 import tkinter as tk
 from functools import partial
 from pathlib import Path
@@ -64,7 +66,7 @@ class ScrolledFrame(tk.Frame):
             )
 
 
-class Aplicacion:
+class Application:
     def __init__(self, root, node):
 
         self.node = node
@@ -125,18 +127,37 @@ class Aplicacion:
         # RoundtripData=0
         # DownloadData=0
 
-        label2 = tk.Label(self.frame_conf, text="CPU(%)", background="light sky blue")
-        label2.grid(row=0, column=10, columnspan=2, sticky="nsew", padx=5, pady=2)
 
-        label3 = tk.Label(
-            self.frame_conf, text="Roundtrip(ms)", background="light sky blue"
+        # ---------------------------------------------------------------
+        # CPU Label
+        # ---------------------------------------------------------------
+        # Create the string variable to update text
+        self.cpu_label_txt = tk.StringVar()
+        self.cpu_label_txt.set("CPU [%]: {:4.2f}".format(0.0))
+
+        # Define the CPU usage label
+        cpu_usage_lb = tk.Label(self.frame_conf, textvariable=self.cpu_label_txt, background="light sky blue")
+        cpu_usage_lb.grid(row=0, column=10, columnspan=2, sticky="w", padx=5, pady=2)
+        # ---------------------------------------------------------------
+
+        # ---------------------------------------------------------------
+        # Roundtrip label
+        # ---------------------------------------------------------------
+        # Create the string variable to update text
+        self.rt_label_txt = tk.StringVar()
+        self.rt_label_txt.set("Roundtrip(ms): {:5.2f}".format(0.0))
+
+        # Define the roundtrip label (from ping-ing the server IP address)
+        roundtrip_lb = tk.Label(
+            self.frame_conf, text="", background="light sky blue"
         )
-        label3.grid(row=1, column=10, columnspan=2, sticky="nsew", padx=5, pady=2)
+        roundtrip_lb.grid(row=1, column=10, columnspan=2, sticky="w", padx=5, pady=2)
+        # ---------------------------------------------------------------
 
         label4 = tk.Label(
             self.frame_conf, text="Download(MB/s)", background="light sky blue"
         )
-        label4.grid(row=2, column=10, columnspan=2, sticky="nsew", padx=5, pady=2)
+        label4.grid(row=2, column=10, columnspan=2, sticky="w", padx=5, pady=2)
 
         self.frame_stats = tk.Frame(self.master, background="light sky blue")
         self.frame_stats.pack()
@@ -152,6 +173,31 @@ class Aplicacion:
         self.NUM_ROWS = 5
         self.NUM_COLS = 3
         self.SELECT_TOPICS = 0
+
+
+        # ---------------------------------------------------------------
+        # CPU Label
+        # ---------------------------------------------------------------
+        # Define the GUI running variable to execute thread as a decent person
+        self.is_gui_running = True
+
+        # Create a thread to update the user interface as a decent person
+        self.update_gui_th = Thread(target=self.update_gui_cb, daemon=True)
+        self.update_gui_th.start()
+        # ---------------------------------------------------------------
+
+    def update_gui_cb(self):
+        while self.is_gui_running:
+
+            # Get the process CPU utilization
+            cpu_percent_val = cpu_percent()
+
+            # Update the CPU utilization text variable
+            self.cpu_label_txt.set("CPU [%]: {:4.2f}".format(cpu_percent_val))
+
+            # Sleep to avoid being inefficient (a.k.a. take care, is Python)
+            sleep(0.1)
+
 
     def url(self):
         host = self.entry.get()
@@ -280,7 +326,7 @@ def main(args=None):
     executor = MultiThreadedExecutor()
 
     root = tk.Tk()
-    app = Aplicacion(root, rosboard_client)
+    app = Application(root, rosboard_client)
     root.geometry("1200x700")
     root.title("Kiwibot Features Interface")
 
