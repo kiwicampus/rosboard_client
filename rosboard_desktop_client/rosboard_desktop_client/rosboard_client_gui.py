@@ -10,8 +10,11 @@ Code Information:
 
 # =============================================================================
 import os
+
 from psutil import cpu_percent
-from psutil import net_if_stats
+from psutil import net_io_counters
+
+
 from time import sleep
 import tkinter as tk
 from functools import partial
@@ -157,14 +160,20 @@ class Application:
         )
         roundtrip_lb.grid(row=1, column=10, columnspan=2, sticky="w", padx=5, pady=2)
         # ---------------------------------------------------------------
-        # Roundtrip label
-        # ---------------------------------------------------------------
-        self.net_ds_txt.
 
-        label4 = tk.Label(
-            self.frame_conf, text="Download(MB/s)", background="light sky blue"
+        # ---------------------------------------------------------------
+        # Download speed
+        # ---------------------------------------------------------------
+        # Create the string variable to update text
+        self.net_ds_txt = tk.StringVar()
+        self.net_ds_txt.set("Download(MB/s): {:4.2f}".format(0.0))
+
+        # Define the download speed label (from 'docker0' network interface)
+
+        download_lb = tk.Label(
+            self.frame_conf, textvariable=self.net_ds_txt, background="light sky blue"
         )
-        label4.grid(row=2, column=10, columnspan=2, sticky="w", padx=5, pady=2)
+        download_lb.grid(row=2, column=10, columnspan=2, sticky="w", padx=5, pady=2)
 
         self.frame_stats = tk.Frame(self.master, background="light sky blue")
         self.frame_stats.pack()
@@ -194,6 +203,13 @@ class Application:
         # ---------------------------------------------------------------
 
     def update_gui_cb(self):
+
+        # Define a variable to store the last received packages count
+        old_bytes_recv = 0
+
+        # Create an iteration variable to calculate download speed
+        download_speed_count = 0
+
         # Runs while interface is running
         while self.is_gui_running:
 
@@ -212,18 +228,29 @@ class Application:
             # Update the CPU utilization text variable
             self.cpu_label_txt.set("CPU [%]: {:4.2f}".format(cpu_percent_val))
 
-            # Get the current networks interfaces statistics
-            net_if_stats_val = net_if_stats()
+            # Check if iterator meets condition
+            if download_speed_count == 4:
 
-            print(net_if_stats_val)
+                # Get the current networks interfaces statistics
+                net_if_stats_val = net_io_counters()
 
-            # Get the 'docker0' network interface speed
-            download_speed_val = net_if_stats_val['docker0'].speed
+                # Calculate the received packages within loop
+                received_bytes = net_if_stats_val.bytes_recv - old_bytes_recv
 
-            # Convert to MB/s
+                # Update the old packages count
+                old_bytes_recv = net_if_stats_val.bytes_recv
 
-            # Update the download speed text variable
-            self.net_ds_txt.set("Download [MB/s]: {:4.2f}".format(download_speed_val))
+                # Convert to MB/s
+                net_if_download_speed = (received_bytes / 1024.0 / 1024.0) / 0.5
+
+                # Update the download speed text variable
+                self.net_ds_txt.set("Download [MiB/s]: {:4.2f}".format(net_if_download_speed))
+
+                # Reset counter
+                download_speed_count = 0
+
+            # Update the iterator counter
+            download_speed_count += 1
 
             # Sleep to avoid being inefficient (a.k.a. take care, is Python)
             sleep(0.1)
