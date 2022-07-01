@@ -11,6 +11,7 @@ Code Information:
 # =============================================================================
 import os
 from psutil import cpu_percent
+from psutil import net_if_stats
 from time import sleep
 import tkinter as tk
 from functools import partial
@@ -143,16 +144,22 @@ class Application:
         # ---------------------------------------------------------------
         # Roundtrip label
         # ---------------------------------------------------------------
+        # Variable to store if a connection is being stabblished
+        self.is_connected = False
+
         # Create the string variable to update text
         self.rt_label_txt = tk.StringVar()
         self.rt_label_txt.set("Roundtrip(ms): {:5.2f}".format(0.0))
 
         # Define the roundtrip label (from ping-ing the server IP address)
         roundtrip_lb = tk.Label(
-            self.frame_conf, text="", background="light sky blue"
+            self.frame_conf, textvariable=self.rt_label_txt, background="light sky blue"
         )
         roundtrip_lb.grid(row=1, column=10, columnspan=2, sticky="w", padx=5, pady=2)
         # ---------------------------------------------------------------
+        # Roundtrip label
+        # ---------------------------------------------------------------
+        self.net_ds_txt.
 
         label4 = tk.Label(
             self.frame_conf, text="Download(MB/s)", background="light sky blue"
@@ -187,7 +194,17 @@ class Application:
         # ---------------------------------------------------------------
 
     def update_gui_cb(self):
+        # Runs while interface is running
         while self.is_gui_running:
+
+            # Checks if there is a connection to the server
+            if self.is_connected:
+
+                # Get the roundtrip value from the server
+                roundtrip_val = 100.0
+
+                # Update the roundtrip value to the server
+                self.rt_label_txt.set("Roundtrip(ms): {:5.2f}".format(roundtrip_val))
 
             # Get the process CPU utilization
             cpu_percent_val = cpu_percent()
@@ -195,11 +212,26 @@ class Application:
             # Update the CPU utilization text variable
             self.cpu_label_txt.set("CPU [%]: {:4.2f}".format(cpu_percent_val))
 
+            # Get the current networks interfaces statistics
+            net_if_stats_val = net_if_stats()
+
+            print(net_if_stats_val)
+
+            # Get the 'docker0' network interface speed
+            download_speed_val = net_if_stats_val['docker0'].speed
+
+            # Convert to MB/s
+
+            # Update the download speed text variable
+            self.net_ds_txt.set("Download [MB/s]: {:4.2f}".format(download_speed_val))
+
             # Sleep to avoid being inefficient (a.k.a. take care, is Python)
             sleep(0.1)
 
 
     def url(self):
+
+        # Gets the 
         host = self.entry.get()
         self.client = RosboardClient(host=host, connection_timeout=5)
         topics = self.client.get_available_topics()
