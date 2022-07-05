@@ -41,25 +41,25 @@ class ScrolledFrame(tk.Frame):
         self.canvas.xview_moveto(0)
         self.canvas.yview_moveto(0)
 
-        self.contenedor = tk.Frame(self.canvas)
-        self.contenedor_id = self.canvas.create_window(
-            0, 0, window=self.contenedor, anchor=tk.NW
+        self.container = tk.Frame(self.canvas)
+        self.container_id = self.canvas.create_window(
+            0, 0, window=self.container, anchor=tk.NW
         )
-        self.contenedor.bind("<Configure>", self._configure_contenedor)
+        self.container.bind("<Configure>", self._configure_contenedor)
         self.canvas.bind("<Configure>", self._configure_canvas)
 
     def _configure_contenedor(self, event):
-        size = (self.contenedor.winfo_reqwidth(), self.contenedor.winfo_reqheight())
+        size = (self.container.winfo_reqwidth(), self.container.winfo_reqheight())
         self.canvas.config(scrollregion="0 0 {} {}".format(*size))
-        if self.contenedor.winfo_reqwidth() != self.canvas.winfo_width():
-            self.canvas.config(width=self.contenedor.winfo_reqwidth())
-        if self.contenedor.winfo_reqheight() != self.canvas.winfo_height():
-            self.canvas.config(height=self.contenedor.winfo_reqheight())
+        if self.container.winfo_reqwidth() != self.canvas.winfo_width():
+            self.canvas.config(width=self.container.winfo_reqwidth())
+        if self.container.winfo_reqheight() != self.canvas.winfo_height():
+            self.canvas.config(height=self.container.winfo_reqheight())
 
     def _configure_canvas(self, event):
-        if self.contenedor.winfo_reqwidth() != self.canvas.winfo_width():
+        if self.container.winfo_reqwidth() != self.canvas.winfo_width():
             self.canvas.itemconfigure(
-                self.contenedor_id, width=self.canvas.winfo_width()
+                self.container_id, width=self.canvas.winfo_width()
             )
 
 
