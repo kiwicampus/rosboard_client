@@ -332,20 +332,8 @@ class Application:
             self.topic_widgets[n] = [datainfospec]
             self.buttons[n].config(state="disabled")
 
-            topic_type = self.client.get_topic_type(topic)
-            # Get the republisher class for a given topic type
-            republisher_class = PublisherManager.getDefaultPublisherForType(topic_type)
-
-            # create the republisher object
-            republisher = republisher_class(
-                parent_node=self.node, topic_name=topic, topic_class_name=topic_type
-            )
-            # create the subscriptions with the republisher callback
-            # each time a message arrives on a topic through rosboard
-            # it will be published under the same topic name on the ros local system
-            self.client.create_socket_subscription(
-                topic_type, topic, republisher.parse_and_publish
-            )
+            # Create the topic handler class
+            topic_handler = TopicHandler(topic, self.client, self.node)
 
         for n, button in enumerate(buttons):
             self.buttons.append(
@@ -384,22 +372,31 @@ class Application:
             for widget in value:
                 widget.grid(row=i, column=j, padx=5, pady=5)
 
-class TopicFrame(tk.Frame):
 
-    def __init__(self, parent, topic):
+class TopicHandler:
 
-        # Intialize super class
-        tk.Frame.__init__(self, parent)
+    def __init__(self, topic, client, node, txt_rate, txt_latency, frame):
 
-        # 
+        # Define the topic type
+        topic_type = client.get_topic_type(topic)
+
+        # Create the republisher 
+        # Get the republisher class for a given topic type
+        republisher_class = PublisherManager.getDefaultPublisherForType(topic_type)
+
+        # create the republisher object
+        self.republisher = republisher_class(
+            parent_node=node, topic_name=topic, topic_class_name=topic_type
+        )
+        # create the subscriptions with the republisher callback
+        # each time a message arrives on a topic through rosboard
+        # it will be published under the same topic name on the ros local system
+        client.create_socket_subscription(
+            topic_type, topic, self.topic_callback
+        )
 
     def topic_callback(self, msg):
-        """! Callback for the topic.
-        """
-
-        print(msg)
-
-        republisher.parse_and_publish(msg)
+        self.republisher.parse_and_publish(msg)
 
 
 class RosboardGUINode(Node):
