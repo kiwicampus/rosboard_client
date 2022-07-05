@@ -298,11 +298,6 @@ class Application:
         self.topic_widgets = {}
 
         def create_topic_spec(topic, n):
-            conect = 0
-            if conect == 1:
-                bg = "green"
-            elif conect == 0:
-                bg = "red"
 
             i = self.SELECT_TOPICS // self.NUM_COLS
             j = self.SELECT_TOPICS % self.NUM_COLS
@@ -312,12 +307,15 @@ class Application:
             datainfospec.grid(row=i, column=j, sticky="nsew", padx=5, pady=2)
 
             labelframe = LabelFrame(
-                datainfospec, background=bg, text=topic, borderwidth=5
+                datainfospec, background="red", text=topic, borderwidth=5
             )
             labelframe.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
 
+            txt_network = tk.StringVar()
+            txt_network.set("Rate [Hz]:  \n ΔT [ms]:")
+
             toplabel = Label(
-                labelframe, text="Rate (Hz):\nΔT (ms):", height=2, width=15, font=16
+                labelframe, textvariable=txt_network, height=2, width=15, font=16
             )
             toplabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
 
@@ -333,7 +331,7 @@ class Application:
             self.buttons[n].config(state="disabled")
 
             # Create the topic handler class
-            topic_handler = TopicHandler(topic, self.client, self.node)
+            topic_handler = TopicHandler(topic, self.client, self.node, txt_network, labelframe)
 
         for n, button in enumerate(buttons):
             self.buttons.append(
@@ -375,7 +373,7 @@ class Application:
 
 class TopicHandler:
 
-    def __init__(self, topic, client, node, txt_rate, txt_latency, frame):
+    def __init__(self, topic, client, node, txt_network, frame):
 
         # Define the topic type
         topic_type = client.get_topic_type(topic)
@@ -395,7 +393,50 @@ class TopicHandler:
             topic_type, topic, self.topic_callback
         )
 
+        # Store the text variable to change values
+        self.txt_network = txt_network
+
+        # Store the frame to change background color
+        self.frame = frame
+
+        # Store the initial time for the 
+        self.t_initial = time()
+
+        # Store the received messages count
+        self.n_msgs = 0
+
+        # Store the last message time
+        self.t_last = 0
+
+
     def topic_callback(self, msg):
+
+        # Increase the message count
+        self.n_msgs += 1
+
+        # Get the current time
+        t_current = time()
+
+        # Calculate average rate
+        f_avg = self.n_msgs / (t_current - self.t_initial)
+
+        # Calculate the last rate value
+        f_last = 1 / (t_current - self.t_last)
+
+        # Update last time
+        self.t_last = t_current
+
+        # Define a red background if rate drops below 95% of average
+        is_red = f_last < f_avg * 0.95
+
+        # Update frame background
+        if is_red:
+            self.frame.config(bg="red")
+        else:
+            self.frame.config(bg="green")
+
+        self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]:".format(f_last))
+
         self.republisher.parse_and_publish(msg)
 
 
