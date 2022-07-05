@@ -406,9 +406,29 @@ class TopicHandler:
         # Store the received messages count
         self.n_msgs = 0
 
-        # Store the last message time
-        self.t_last = 0
+        # Define the number of time values used in the average calculation
+        self.N = 20
 
+        # Store the last message time
+        self.t_last = 0.0
+
+        # List for storing the last N rate values
+        self.t_last_window = [0.0 for i in range(self.N)]
+
+        # Define the alpha for calculating the average
+        self.alpha = 2.0 / (self.N + 1)
+
+        # Calculate the required 1-alpha
+        self.c_alpha = 1.0 - self.alpha
+
+    def calculate_average_rate(self, time_list):
+        """! Calculate the average rate using EWMA.
+            @param time_list: list with the last 
+        """
+        average = time_list[0]
+        for indx in range(1, self.N):
+            average = self.alpha * time_list[indx] + self.c_alpha * average
+        return average
 
     def topic_callback(self, msg):
 
@@ -421,10 +441,16 @@ class TopicHandler:
         # Calculate average rate
         f_avg = self.n_msgs / (t_current - self.t_initial)
 
-        # Calculate the last rate value
-        f_last = 1 / (t_current - self.t_last)
+        # Update the window values
+        self.t_last_window.insert(0, 1.0 / (t_current - self.t_last))
 
-        # Update last time
+        # Discard the oldest value
+        self.t_last_window.pop(-1)
+
+        # Calculate the average using the window
+        f_last = self.calculate_average_rate(self.t_last_window)
+
+        # Update last time value
         self.t_last = t_current
 
         # Define a red background if rate drops below 95% of average
