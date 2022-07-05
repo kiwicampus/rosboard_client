@@ -429,14 +429,34 @@ class TopicHandler:
         # Define a red background if rate drops below 95% of average
         is_red = f_last < f_avg * 0.95
 
-        # Update frame background
+        # Update frame background conditionally
         if is_red:
             self.frame.config(bg="red")
         else:
             self.frame.config(bg="green")
 
-        self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]:".format(f_last))
+        # Check if message includes header
+        if "header" in msg[1].keys():
 
+            # Get the message stamp
+            stamp = msg[1]["header"]["stamp"]
+
+            # Calculate the header timestamp
+            t_send = stamp["sec"] + stamp["nanosec"] * 10 ** -9
+
+            # Calculates the time delta
+            t_delta = t_current - t_send
+
+            # Set the network text label
+            self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: {:4.2f}".format(f_last, t_delta))
+        
+        # Defines t_delta as None if header not present
+        else:
+            
+            # Set the network text label
+            self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: N/A".format(f_last))
+            
+        # Parse and publish the message into ROS
         self.republisher.parse_and_publish(msg)
 
 
