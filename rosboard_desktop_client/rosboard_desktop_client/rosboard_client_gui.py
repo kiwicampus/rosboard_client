@@ -10,22 +10,13 @@ Code Information:
 
 # =============================================================================
 import os
-
-from psutil import cpu_percent
-from psutil import net_io_counters
-
-
-from time import sleep, time
 import tkinter as tk
 from functools import partial
 from pathlib import Path
 from threading import Thread
 from tkinter import *
 
-from icmplib import ping
-
 import rclpy
-import yaml
 from PIL import Image, ImageTk
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
@@ -133,160 +124,35 @@ class Application:
         # RoundtripData=0
         # DownloadData=0
 
+        label2 = tk.Label(self.frame_conf, text="CPU(%)", background="light sky blue")
+        label2.grid(row=0, column=10, columnspan=2, sticky="nsew", padx=5, pady=2)
 
-        # ---------------------------------------------------------------
-        # CPU Label
-        # ---------------------------------------------------------------
-        # Create the string variable to update text
-        self.cpu_label_txt = tk.StringVar()
-        self.cpu_label_txt.set("CPU [%]: {:4.2f}".format(0.0))
-
-        # Define the CPU usage label
-        cpu_usage_lb = tk.Label(self.frame_conf, textvariable=self.cpu_label_txt, background="light sky blue")
-        cpu_usage_lb.grid(row=0, column=10, columnspan=2, sticky="w", padx=5, pady=2)
-        # ---------------------------------------------------------------
-
-        # ---------------------------------------------------------------
-        # Roundtrip label
-        # ---------------------------------------------------------------
-        # Variable to store if a connection is being stabblished
-        self.is_connected = False
-
-        # Variable to store the connection IP address
-        self.server_ip_addr = ""
-
-        # Create the string variable to update text
-        self.rt_label_txt = tk.StringVar()
-        self.rt_label_txt.set("Roundtrip [ms]: {:5.2f}".format(0.0))
-
-        # Define the roundtrip label (from ping-ing the server IP address)
-        roundtrip_lb = tk.Label(
-            self.frame_conf, textvariable=self.rt_label_txt, background="light sky blue"
+        label3 = tk.Label(
+            self.frame_conf, text="Roundtrip(ms)", background="light sky blue"
         )
-        roundtrip_lb.grid(row=1, column=10, columnspan=2, sticky="w", padx=5, pady=2)
-        # ---------------------------------------------------------------
+        label3.grid(row=1, column=10, columnspan=2, sticky="nsew", padx=5, pady=2)
 
-        # ---------------------------------------------------------------
-        # Download speed
-        # ---------------------------------------------------------------
-        # Create the string variable to update text
-        self.net_ds_txt = tk.StringVar()
-        self.net_ds_txt.set("Download [MB/s]: {:4.2f}".format(0.0))
-
-        # Define the download speed label (from 'docker0' network interface)
-
-        download_lb = tk.Label(
-            self.frame_conf, textvariable=self.net_ds_txt, background="light sky blue"
+        label4 = tk.Label(
+            self.frame_conf, text="Download(MB/s)", background="light sky blue"
         )
-        download_lb.grid(row=2, column=10, columnspan=2, sticky="w", padx=5, pady=2)
+        label4.grid(row=2, column=10, columnspan=2, sticky="nsew", padx=5, pady=2)
 
         self.frame_stats = tk.Frame(self.master, background="light sky blue")
         self.frame_stats.pack()
 
         self.frame_buttons = ScrolledFrame(self.frame_stats)
-        self.frame_buttons.grid(row=1, column=1, columnspan=2)
+        self.frame_buttons.pack(side="left")
 
         self.datainfogen = tk.Frame(self.frame_stats, background="light sky blue")
-        self.datainfogen.grid(
-            row=1, column=3, columnspan=5, sticky="nsew", padx=5, pady=2
-        )
+        self.datainfogen.pack(side="right", padx=116, ipady=10, anchor="nw")
 
         self.NUM_ROWS = 5
         self.NUM_COLS = 3
         self.SELECT_TOPICS = 0
 
-
-        # ---------------------------------------------------------------
-        # CPU Label
-        # ---------------------------------------------------------------
-        # Define the GUI running variable to execute thread as a decent person
-        self.is_gui_running = True
-
-        # Create a thread to update the user interface as a decent person
-        self.update_gui_th = Thread(target=self.update_gui_cb, daemon=True)
-        self.update_gui_th.start()
-        # ---------------------------------------------------------------
-
-    def update_gui_cb(self):
-
-        # Define a variable to store the last received packages count
-        old_bytes_recv = 0
-
-        # Create an iteration variable to calculate download speed
-        download_speed_count = 0
-
-        # Runs while interface is running
-        while self.is_gui_running:
-
-            # Checks if there is a connection to the server
-            if self.is_connected:
-
-                # Get the roundtrip value from the server
-                ping_response_val = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
-
-                # Update the roundtrip value to the server
-                self.rt_label_txt.set("Roundtrip [ms]: {:5.2f}".format(ping_response_val.avg_rtt))
-
-            # Get the process CPU utilization
-            cpu_percent_val = cpu_percent()
-
-            # Update the CPU utilization text variable
-            self.cpu_label_txt.set("CPU [%]: {:4.2f}".format(cpu_percent_val))
-
-            # Check if iterator meets condition
-            if download_speed_count == 4:
-
-                # Get the current networks interfaces statistics
-                net_if_stats_val = net_io_counters()
-
-                # Calculate the received packages within loop
-                received_bytes = net_if_stats_val.bytes_recv - old_bytes_recv
-
-                # Update the old packages count
-                old_bytes_recv = net_if_stats_val.bytes_recv
-
-                # Convert to MB/s
-                net_if_download_speed = (received_bytes / 1024.0 / 1024.0) / 0.5
-
-                # Update the download speed text variable
-                self.net_ds_txt.set("Download [MiB/s]: {:4.2f}".format(net_if_download_speed))
-
-                # Reset counter
-                download_speed_count = 0
-
-            # Update the iterator counter
-            download_speed_count += 1
-
-            # Sleep to avoid being inefficient (a.k.a. take care, is Python)
-            sleep(0.1)
-
-
     def url(self):
-
-        # Gets the target server address
         host = self.entry.get()
-
-        # Get the server IP address
-        self.server_ip_addr = host.split(':')[0]
-
-        # Execute under try/except block to be decent
-        try:
-            # Connect to ROSBOARD client
-            self.client = RosboardClient(host=host, connection_timeout=5)
-        
-        # Handle the exception if connection is not possible
-        except Exception as e:
-
-            # Log the error message
-            rclpy.get_logger().error("Could not connect to server!")
-
-            # Explicitly set the connection variable to false
-            self.is_connected = False
-
-        # Set the variable to indicate that connection was achieved
-        self.is_connected = True
-
-        # 
+        self.client = RosboardClient(host=host, connection_timeout=5)
         topics = self.client.get_available_topics()
 
         for button in self.buttons:
@@ -298,6 +164,11 @@ class Application:
         self.topic_widgets = {}
 
         def create_topic_spec(topic, n):
+            conect = 1
+            if conect == 1:
+                bg = "green"
+            elif conect == 0:
+                bg = "red"
 
             i = self.SELECT_TOPICS // self.NUM_COLS
             j = self.SELECT_TOPICS % self.NUM_COLS
@@ -305,19 +176,20 @@ class Application:
 
             datainfospec = tk.Frame(self.datainfogen, background="light sky blue")
             datainfospec.grid(row=i, column=j, sticky="nsew", padx=5, pady=2)
+            datainfospec.columnconfigure(0, weight=3)
+            datainfospec.columnconfigure(1, weight=1)
+            datainfospec.rowconfigure(0, weight=1)
+            datainfospec.rowconfigure(1, weight=2)
 
             labelframe = LabelFrame(
-                datainfospec, background="red", text=topic, borderwidth=5
+                datainfospec, background=bg, text=topic, borderwidth=5
             )
-            labelframe.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
-
-            txt_network = tk.StringVar()
-            txt_network.set("Rate [Hz]:  \n ΔT [ms]:")
+            labelframe.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
 
             toplabel = Label(
-                labelframe, textvariable=txt_network, height=2, width=15, font=16
+                labelframe, text="Rate (Hz):\nΔT (ms):", height=2, width=15, font=16
             )
-            toplabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
+            toplabel.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
 
             button_close = tk.Button(
                 datainfospec,
@@ -325,13 +197,25 @@ class Application:
                 command=partial(self.quit, topic, n),
                 background="#8B0000",
             )
-            button_close.grid(row=0, column=2, padx=5, pady=5)
+            button_close.grid(row=0, column=1, columnspan=1, sticky="e")
 
             self.topic_widgets[n] = [datainfospec]
             self.buttons[n].config(state="disabled")
 
-            # Create the topic handler class
-            topic_handler = TopicHandler(topic, self.client, self.node, txt_network, labelframe)
+            topic_type = self.client.get_topic_type(topic)
+            # Get the republisher class for a given topic type
+            republisher_class = PublisherManager.getDefaultPublisherForType(topic_type)
+
+            # create the republisher object
+            republisher = republisher_class(
+                parent_node=self.node, topic_name=topic, topic_class_name=topic_type
+            )
+            # create the subscriptions with the republisher callback
+            # each time a message arrives on a topic through rosboard
+            # it will be published under the same topic name on the ros local system
+            self.client.create_socket_subscription(
+                topic_type, topic, republisher.parse_and_publish
+            )
 
         for n, button in enumerate(buttons):
             self.buttons.append(
@@ -347,7 +231,7 @@ class Application:
                 row=button["pos"][0],
                 sticky="nsew",
                 pady=5,
-                padx=1,
+                padx=15,
             )
 
     def quit(self, topic, n):
@@ -369,95 +253,6 @@ class Application:
                 widget.grid_remove()
             for widget in value:
                 widget.grid(row=i, column=j, padx=5, pady=5)
-
-
-class TopicHandler:
-
-    def __init__(self, topic, client, node, txt_network, frame):
-
-        # Define the topic type
-        topic_type = client.get_topic_type(topic)
-
-        # Create the republisher 
-        # Get the republisher class for a given topic type
-        republisher_class = PublisherManager.getDefaultPublisherForType(topic_type)
-
-        # create the republisher object
-        self.republisher = republisher_class(
-            parent_node=node, topic_name=topic, topic_class_name=topic_type
-        )
-        # create the subscriptions with the republisher callback
-        # each time a message arrives on a topic through rosboard
-        # it will be published under the same topic name on the ros local system
-        client.create_socket_subscription(
-            topic_type, topic, self.topic_callback
-        )
-
-        # Store the text variable to change values
-        self.txt_network = txt_network
-
-        # Store the frame to change background color
-        self.frame = frame
-
-        # Store the initial time for the 
-        self.t_initial = time()
-
-        # Store the received messages count
-        self.n_msgs = 0
-
-        # Store the last message time
-        self.t_last = 0
-
-
-    def topic_callback(self, msg):
-
-        # Increase the message count
-        self.n_msgs += 1
-
-        # Get the current time
-        t_current = time()
-
-        # Calculate average rate
-        f_avg = self.n_msgs / (t_current - self.t_initial)
-
-        # Calculate the last rate value
-        f_last = 1 / (t_current - self.t_last)
-
-        # Update last time
-        self.t_last = t_current
-
-        # Define a red background if rate drops below 95% of average
-        is_red = f_last < f_avg * 0.95
-
-        # Update frame background conditionally
-        if is_red:
-            self.frame.config(bg="red")
-        else:
-            self.frame.config(bg="green")
-
-        # Check if message includes header
-        if "header" in msg[1].keys():
-
-            # Get the message stamp
-            stamp = msg[1]["header"]["stamp"]
-
-            # Calculate the header timestamp
-            t_send = stamp["sec"] + stamp["nanosec"] * 10 ** -9
-
-            # Calculates the time delta
-            t_delta = t_current - t_send
-
-            # Set the network text label
-            self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: {:4.2f}".format(f_last, t_delta))
-        
-        # Defines t_delta as None if header not present
-        else:
-            
-            # Set the network text label
-            self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: N/A".format(f_last))
-            
-        # Parse and publish the message into ROS
-        self.republisher.parse_and_publish(msg)
 
 
 class RosboardGUINode(Node):
@@ -487,7 +282,7 @@ def main(args=None):
 
     root = tk.Tk()
     app = Application(root, rosboard_client)
-    root.geometry("1200x700")
+    root.geometry("1250x600")
     root.title("Kiwibot Features Interface")
 
     # Run root.mainloop in a separate python thread
