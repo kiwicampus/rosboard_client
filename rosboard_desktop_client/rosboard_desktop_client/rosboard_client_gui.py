@@ -15,12 +15,14 @@ from psutil import cpu_percent
 from psutil import net_io_counters
 
 
-from time import sleep
+from time import sleep, time
 import tkinter as tk
 from functools import partial
 from pathlib import Path
 from threading import Thread
 from tkinter import *
+
+from icmplib import ping
 
 import rclpy
 import yaml
@@ -150,9 +152,12 @@ class Application:
         # Variable to store if a connection is being stabblished
         self.is_connected = False
 
+        # Variable to store the connection IP address
+        self.server_ip_addr = ""
+
         # Create the string variable to update text
         self.rt_label_txt = tk.StringVar()
-        self.rt_label_txt.set("Roundtrip(ms): {:5.2f}".format(0.0))
+        self.rt_label_txt.set("Roundtrip [ms]: {:5.2f}".format(0.0))
 
         # Define the roundtrip label (from ping-ing the server IP address)
         roundtrip_lb = tk.Label(
@@ -166,7 +171,7 @@ class Application:
         # ---------------------------------------------------------------
         # Create the string variable to update text
         self.net_ds_txt = tk.StringVar()
-        self.net_ds_txt.set("Download(MB/s): {:4.2f}".format(0.0))
+        self.net_ds_txt.set("Download [MB/s]: {:4.2f}".format(0.0))
 
         # Define the download speed label (from 'docker0' network interface)
 
@@ -217,10 +222,10 @@ class Application:
             if self.is_connected:
 
                 # Get the roundtrip value from the server
-                roundtrip_val = 100.0
+                ping_response_val = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
 
                 # Update the roundtrip value to the server
-                self.rt_label_txt.set("Roundtrip(ms): {:5.2f}".format(roundtrip_val))
+                self.rt_label_txt.set("Roundtrip [ms]: {:5.2f}".format(ping_response_val.avg_rtt))
 
             # Get the process CPU utilization
             cpu_percent_val = cpu_percent()
@@ -258,9 +263,30 @@ class Application:
 
     def url(self):
 
-        # Gets the 
+        # Gets the target server address
         host = self.entry.get()
-        self.client = RosboardClient(host=host, connection_timeout=5)
+
+        # Get the server IP address
+        self.server_ip_addr = host.split(':')[0]
+
+        # Execute under try/except block to be decent
+        try:
+            # Connect to ROSBOARD client
+            self.client = RosboardClient(host=host, connection_timeout=5)
+        
+        # Handle the exception if connection is not possible
+        except Exception as e:
+
+            # Log the error message
+            rclpy.get_logger().error("Could not connect to server!")
+
+            # Explicitly set the connection variable to false
+            self.is_connected = False
+
+        # Set the variable to indicate that connection was achieved
+        self.is_connected = True
+
+        # 
         topics = self.client.get_available_topics()
 
         for button in self.buttons:
@@ -357,6 +383,23 @@ class Application:
                 widget.grid_remove()
             for widget in value:
                 widget.grid(row=i, column=j, padx=5, pady=5)
+
+class TopicFrame(tk.Frame):
+
+    def __init__(self, parent, topic):
+
+        # Intialize super class
+        tk.Frame.__init__(self, parent)
+
+        # 
+
+    def topic_callback(self, msg):
+        """! Callback for the topic.
+        """
+
+        print(msg)
+
+        republisher.parse_and_publish(msg)
 
 
 class RosboardGUINode(Node):
