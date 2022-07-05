@@ -310,7 +310,7 @@ class Application:
             labelframe = LabelFrame(
                 datainfospec, background="red", text=topic, borderwidth=5
             )
-            labelframe.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+            labelframe.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
 
             txt_network = tk.StringVar()
             txt_network.set("Rate [Hz]:  \n ΔT [ms]:")
@@ -318,7 +318,7 @@ class Application:
             toplabel = Label(
                 labelframe, textvariable=txt_network, height=2, width=15, font=16
             )
-            toplabel.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+            toplabel.grid(row=0, column=0, columnspan=2, padx=5, pady=5)
 
             button_close = tk.Button(
                 datainfospec,
@@ -326,7 +326,7 @@ class Application:
                 command=partial(self.quit, topic, n),
                 background="#8B0000",
             )
-            button_close.grid(row=0, column=1, columnspan=1, sticky="e")
+            button_close.grid(row=0, column=2, columnspan=1, sticky="e")
 
             self.topic_widgets[n] = [datainfospec]
             self.buttons[n].config(state="disabled")
@@ -337,7 +337,7 @@ class Application:
         for n, button in enumerate(buttons):
             self.buttons.append(
                 tk.Button(
-                    self.frame_buttons.contenedor,
+                    self.frame_buttons.container,
                     text=button["text"],
                     background="#40E0D0",
                     command=partial(create_topic_spec, button["text"], n),
