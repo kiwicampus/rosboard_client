@@ -376,6 +376,8 @@ class TopicHandler:
 
     def __init__(self, topic, client, node, txt_network, frame):
 
+        self.topic = topic
+
         # Define the topic type
         topic_type = client.get_topic_type(topic)
 
@@ -400,7 +402,7 @@ class TopicHandler:
         # Store the frame to change background color
         self.frame = frame
 
-        # Store the initial time for the 
+        # Attribute to store the initial time
         self.t_initial = time()
 
         # Store the received messages count
@@ -410,24 +412,45 @@ class TopicHandler:
         self.N = 20
 
         # Store the last message time
-        self.t_last = 0.0
+        self.t_last = None
 
         # List for storing the last N rate values
-        self.t_last_window = [0.0 for i in range(self.N)]
+        self.t_last_window = []
 
         # Define the alpha for calculating the average
-        self.alpha = 2.0 / (self.N + 1)
+        self.alpha = 1.0
 
         # Calculate the required 1-alpha
         self.c_alpha = 1.0 - self.alpha
 
+        # Attribute to handle the timer thread
+        self.is_alive = True
+
+        # Start the timeout thread
+        timeout_th = Thread(target=self.timeout, daemon=True)
+        timeout_th.start()
+
+    def __del__(self):
+        """! Kill the thread decently. """
+        self.is_alive = False
+
+    def timeout(self):
+        while self.is_alive:
+            if self.t_last is not None:
+                if time() - self.t_last > 5.0:
+                    self.frame.config(bg="gray")
+            sleep(0.01)
+        
+
     def calculate_average_rate(self, time_list):
         """! Calculate the average rate using EWMA.
-            @param time_list: list with the last 
+            @param time_list: list with the last time delta values.
         """
         average = time_list[0]
-        for indx in range(1, self.N):
-            average = self.alpha * time_list[indx] + self.c_alpha * average
+        list_size = len(self.t_last_window)
+        if list_size > 1:
+            for indx in range(1, list_size):
+                average = self.alpha * time_list[indx] + self.c_alpha * average
         return average
 
     def topic_callback(self, msg):
@@ -441,48 +464,55 @@ class TopicHandler:
         # Calculate average rate
         f_avg = self.n_msgs / (t_current - self.t_initial)
 
-        # Update the window values
-        self.t_last_window.insert(0, 1.0 / (t_current - self.t_last))
+        # Discard first measurement
+        if self.t_last is not None:
 
-        # Discard the oldest value
-        self.t_last_window.pop(-1)
+            # Update the window values
+            self.t_last_window.insert(0, t_current - self.t_last)
 
-        # Calculate the average using the window
-        f_last = self.calculate_average_rate(self.t_last_window)
+            # Check if window list is full or not to discard values
+            if len(self.t_last_window) > self.N:
+                self.t_last_window.pop(-1)
+            else:
+                self.alpha = 2.0 / (len(self.t_last_window) + 1.0)
+                self.c_alpha = 1.0 - self.alpha
 
+            # Calculate the average using the window
+            f_last = 1.0 / self.calculate_average_rate(self.t_last_window)
+
+            # Define a red background if rate drops below 80% of average
+            is_red = f_last < f_avg * 0.80
+
+            # Update frame background conditionally
+            if is_red:
+                self.frame.config(bg="red")
+            else:
+                self.frame.config(bg="green")
+
+            # Check if message includes header
+            if "header" in msg[1].keys():
+
+                # Get the message stamp
+                stamp = msg[1]["header"]["stamp"]
+
+                # Calculate the header timestamp
+                t_send = stamp["sec"] + stamp["nanosec"] * 10 ** -9
+
+                # Calculates the time delta
+                t_delta = t_current - t_send
+
+                # Set the network text label
+                self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: {:4.2f}".format(f_last, t_delta))
+            
+            # Defines t_delta as None if header not present
+            else:
+                
+                # Set the network text label
+                self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: N/A".format(f_last))
+            
         # Update last time value
         self.t_last = t_current
 
-        # Define a red background if rate drops below 95% of average
-        is_red = f_last < f_avg * 0.95
-
-        # Update frame background conditionally
-        if is_red:
-            self.frame.config(bg="red")
-        else:
-            self.frame.config(bg="green")
-
-        # Check if message includes header
-        if "header" in msg[1].keys():
-
-            # Get the message stamp
-            stamp = msg[1]["header"]["stamp"]
-
-            # Calculate the header timestamp
-            t_send = stamp["sec"] + stamp["nanosec"] * 10 ** -9
-
-            # Calculates the time delta
-            t_delta = t_current - t_send
-
-            # Set the network text label
-            self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: {:4.2f}".format(f_last, t_delta))
-        
-        # Defines t_delta as None if header not present
-        else:
-            
-            # Set the network text label
-            self.txt_network.set("Rate [Hz]: {:4.2f} \n ΔT [ms]: N/A".format(f_last))
-            
         # Parse and publish the message into ROS
         self.republisher.parse_and_publish(msg)
 
