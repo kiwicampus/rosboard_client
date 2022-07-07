@@ -15,7 +15,7 @@ import threading
 import logging
 
 from twisted.internet import reactor
-
+from twisted.internet.protocol import ReconnectingClientFactory
 
 from autobahn.twisted.websocket import (
     WebSocketClientFactory,
@@ -208,7 +208,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         )
 
 
-class RosboardClient(WebSocketClientFactory):
+class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
     protocol = RosboardClientProtocol
 
     def __init__(self, host: str, connection_timeout: float):
@@ -235,7 +235,7 @@ class RosboardClient(WebSocketClientFactory):
             socket_url = "ws://" + host + "/rosboard/v1"
         WebSocketClientFactory.__init__(self, url=socket_url)
         self.logger.info(f"connecting to {socket_url}")
-        self.connector = connectWS(self)
+        self.connector = connectWS(self, connection_timeout)
         # protocol object. Set when the socket is ready
         self._proto = None
 
@@ -320,6 +320,7 @@ class RosboardClient(WebSocketClientFactory):
         to the server
         @param proto (WebSocketClientFactory) the protocol object
         """
+        ReconnectingClientFactory.resetDelay(self)
         self._proto = proto
 
     def set_available_topics(self, topics: dict) -> None:
@@ -365,7 +366,7 @@ class RosboardClient(WebSocketClientFactory):
             Exception: Always raises an exception, the connection with the server should not be lost
         """
         self.logger.error(f"Lost connection with {self.url}, reason: {reason}")
-        raise Exception("Connection Lost")
+        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
     def clientConnectionFailed(self, connector, reason):
         """!
@@ -374,4 +375,4 @@ class RosboardClient(WebSocketClientFactory):
             Exception: Always raises an exception. Connection should not fail
         """
         self.logger.error(f"Failed to connect to {self.url}, reason: {reason}")
-        raise Exception("Unable to connect")
+        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
