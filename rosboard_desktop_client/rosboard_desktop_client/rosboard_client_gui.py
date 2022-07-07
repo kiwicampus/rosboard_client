@@ -23,6 +23,7 @@ from threading import Thread
 from tkinter import *
 
 from icmplib import ping
+from socket import socket, AF_INET, SOCK_STREAM
 
 import rclpy
 from PIL import Image, ImageTk
@@ -112,26 +113,21 @@ class Application:
         self.entry.insert(END, "localhost:8888")
         self.entry.grid(row=1, column=2, columnspan=3, sticky=tk.W + tk.E, padx=5)
 
-        buttonCon = tk.Button(
+        self.bt_conn = tk.Button(
             self.frame_conf,
             text="CONNECT",
             command=self.url,
             background="light sky blue",
         )
-        buttonCon.grid(row=1, column=5, columnspan=2, sticky="ew")
+        self.bt_conn.grid(row=1, column=5, columnspan=2, sticky="ew")
 
-        ButtonStat = tk.Button(
+        self.bt_alive = tk.Button(
             self.frame_conf, text="STATUS", bg="#90EE90", state=DISABLED
         )
         # Light green #90EE90
         # Grey #D3D3D3
         # Light red #FF7F7F
-        ButtonStat.grid(row=1, column=9, columnspan=1, sticky="ew")
-
-        # CPUData=0
-        # RoundtripData=0
-        # DownloadData=0
-
+        self.bt_alive.grid(row=1, column=9, columnspan=1, sticky="ew")
 
         # ---------------------------------------------------------------
         # CPU Label
@@ -215,8 +211,23 @@ class Application:
         # Runs while interface is running
         while self.is_gui_running:
 
-            # Checks if there is a connection to the server
-            if self.is_connected:
+            # Executes if interface is not connected to socket
+            if not self.is_connected:
+                
+                # Test the connection to the IP field
+                is_alive = self.test_socket_status()
+
+                # Configures the interface depending on server result
+                if is_alive:
+                    self.bt_conn.config(state=NORMAL)
+                else:
+                    self.bt_conn.config(state=DISABLED)
+
+            # Executes if connected to socket
+            else:
+
+                # Disables connection button
+                self.bt_conn.config(state=DISABLED)
 
                 # Get the roundtrip value from the server
                 ping_response_val = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
@@ -258,27 +269,55 @@ class Application:
             sleep(0.1)
 
 
-    def url(self):
-
-        # Gets the target server address
+    def test_socket_status(self):
+        """!Test the connection to the current address in field.
+        @return bool with the socket status.
+        """
+        # Get the target server address
         host = self.entry.get()
 
-        # Get the server IP address
-        self.server_ip_addr = host.split(':')[0]
+        # Get the ip address and port
+        ip_address, port = host.split(':')
+
+        # Create the test socket
+        test_socket = socket(AF_INET, SOCK_STREAM)
+
+        # Attempt connection to the server to check status
+        socket_alive = test_socket.connect_ex((ip_address, int(port)))
+        
+        # Convert to boolean variable
+        socket_alive = socket_alive == 0
+
+        # Close socket connection
+        test_socket.close()
+
+        # Return the connection status
+        return socket_alive
+
+
+    def url(self):
 
         # Execute under try/except block to be decent
         try:
-            # Connect to ROSBOARD client
-            self.client = RosboardClient(host=host, connection_timeout=5)
+            # Get the IP address
+            target_addr = self.entry.get()
+
+            # Get the server IP address
+            self.server_ip_addr = target_addr.split(":")[0]
+
+            # Connect to rosboard client
+            self.client = RosboardClient(host=target_addr, connection_timeout=5)
         
         # Handle the exception if connection is not possible
         except Exception as e:
 
             # Log the error message
-            rclpy.get_logger().error("Could not connect to server!")
+            rclpy.logging.get_logger("rosboard_gui_client").error("Could not connect to server!")
 
             # Explicitly set the connection variable to false
             self.is_connected = False
+
+            return
 
         # Set the variable to indicate that connection was achieved
         self.is_connected = True
