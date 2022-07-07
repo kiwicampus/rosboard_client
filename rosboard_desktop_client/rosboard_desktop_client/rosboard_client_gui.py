@@ -10,6 +10,7 @@ Code Information:
 
 # =============================================================================
 import os
+from turtle import width
 
 from psutil import cpu_percent
 from psutil import net_io_counters
@@ -208,11 +209,13 @@ class Application:
         # Create an iteration variable to calculate download speed
         download_speed_count = 0
 
+        conn_test_count = 0
+
         # Runs while interface is running
         while self.is_gui_running:
 
             # Executes if interface is not connected to socket
-            if not self.is_connected:
+            if not self.is_connected and conn_test_count == 4:
                 
                 # Test the connection to the IP field
                 is_alive = self.test_socket_status()
@@ -222,6 +225,11 @@ class Application:
                     self.bt_conn.config(state=NORMAL)
                 else:
                     self.bt_conn.config(state=DISABLED)
+
+                conn_test_count = 0
+
+            elif conn_test_count < 4:
+                conn_test_count += 1
 
             # Executes if connected to socket
             else:
@@ -276,24 +284,31 @@ class Application:
         # Get the target server address
         host = self.entry.get()
 
-        # Get the ip address and port
-        ip_address, port = host.split(':')
-
-        # Create the test socket
-        test_socket = socket(AF_INET, SOCK_STREAM)
-
-        # Attempt connection to the server to check status
-        socket_alive = test_socket.connect_ex((ip_address, int(port)))
+        try:
+            # Get the ip address and port
+            ip_address, port = host.split(':')
         
-        # Convert to boolean variable
-        socket_alive = socket_alive == 0
+            # Create the test socket
+            test_socket = socket(AF_INET, SOCK_STREAM)
 
-        # Close socket connection
-        test_socket.close()
+            test_socket.settimeout(0.5)
 
-        # Return the connection status
-        return socket_alive
+            # Attempt connection to the server to check status
+            socket_alive = test_socket.connect_ex((ip_address, int(port)))
 
+            rclpy.logging.get_logger("rosboard_gui_client").info(f"Port: {int(port)}")
+            
+            # Convert to boolean variable
+            socket_alive = socket_alive == 0
+
+            # Close socket connection
+            test_socket.close()
+
+            # Return the connection status
+            return socket_alive
+
+        except ValueError as e:
+            return False
 
     def url(self):
 
