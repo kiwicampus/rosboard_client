@@ -37,6 +37,11 @@ from rosboard_desktop_client.streamers import GenericStreamer
 
 class ScrolledFrame(tk.Frame):
     def __init__(self, parent, *args, **kw):
+        """!
+        ScrolledFrame builder. This is a custom class that allows
+        a canvas to have scrolling bars on the Y axis.
+        @param parent 'tk.' parent frame for the class.
+        """
         tk.Frame.__init__(self, parent, *args, **kw)
 
         vscrollbar = tk.Scrollbar(self, orient=tk.VERTICAL)
@@ -58,8 +63,9 @@ class ScrolledFrame(tk.Frame):
         self.canvas.bind("<Configure>", self._configure_canvas)
 
     def _configure_container(self, event):
-        """!Configures the container.
-            @param event: event that will be handled with this callback.
+        """!
+        Configures the container height on configure event.
+        @param event  that will be handled with this callback.
         """
         size = (self.container.winfo_reqwidth(), self.container.winfo_reqheight())
         self.canvas.config(scrollregion="0 0 {} {}".format(*size))
@@ -69,8 +75,9 @@ class ScrolledFrame(tk.Frame):
             self.canvas.config(height=self.container.winfo_reqheight())
 
     def _configure_canvas(self, event):
-        """!Configures the canvas height.
-            @param event: event that will be handled with this callback.
+        """!
+        Configures the canvas height on configure event.
+        @param event: event that will be handled with this callback.
         """
         if self.container.winfo_reqwidth() != self.canvas.winfo_width():
             self.canvas.itemconfigure(
@@ -82,30 +89,21 @@ class Application:
     def __init__(self, root, node):
 
         self.node = node
-        canvasmain = tk.Canvas(root)
-        canvasmain.pack(fill="both", expand=True)
+        self.canvasmain = tk.Canvas(root)
+        self.canvasmain.pack(fill="both", expand=True)
 
         this_path = Path(os.path.realpath(__file__))
         self.background_path = os.path.join(
             this_path.parent, "resources", "background.jpg"
         )
-        img = ImageTk.PhotoImage(Image.open(self.background_path))
-        canvasmain.create_image(0, 0, anchor="nw", image=img)
+        self.image = ImageTk.PhotoImage(Image.open(self.background_path))
+        self.canvasmain.create_image(0, 0, anchor="nw", image=self.image)
 
-        def resize_image(e):
-            global image, resized, image2
-            # open image to resize it
-            image = Image.open(self.background_path)
-            # resize the image with width and height of root
-            resized = image.resize((e.width, e.height), Image.ANTIALIAS)
-            image2 = ImageTk.PhotoImage(resized)
-            canvasmain.create_image(0, 0, image=image2, anchor="nw")
+        self.canvasmain.bind("<Configure>", self.resize_background_image)
+        self.canvasmain.xview_moveto(0)
+        self.canvasmain.yview_moveto(0)
 
-        canvasmain.bind("<Configure>", resize_image)
-        canvasmain.xview_moveto(0)
-        canvasmain.yview_moveto(0)
-
-        self.master = canvasmain
+        self.master = self.canvasmain
         self.buttons = []
         self.data = []
 
@@ -205,6 +203,19 @@ class Application:
         self.update_gui_th = Thread(target=self.update_gui_cb, daemon=True)
         self.update_gui_th.start()
         # ---------------------------------------------------------------
+
+    def resize_background_image(self, event):
+        """!
+        Resizes the background image after a configure event.
+        @param event 'tkinter.Event' configure event that raises this callback.
+        """
+        # open image to resize it
+        self.image = Image.open(self.background_path)
+        # resize the image with width and height of root
+        self.image = self.image.resize((event.width, event.height), Image.ANTIALIAS)
+        self.image = ImageTk.PhotoImage(self.image)
+        # Update the main canvas
+        self.canvasmain.create_image(0, 0, image=self.image, anchor="nw")
 
     def update_gui_cb(self):
 
