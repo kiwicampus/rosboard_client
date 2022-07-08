@@ -54,10 +54,13 @@ class ScrolledFrame(tk.Frame):
         self.container_id = self.canvas.create_window(
             0, 0, window=self.container, anchor=tk.NW
         )
-        self.container.bind("<Configure>", self._configure_contenedor)
+        self.container.bind("<Configure>", self._configure_container)
         self.canvas.bind("<Configure>", self._configure_canvas)
 
-    def _configure_contenedor(self, event):
+    def _configure_container(self, event):
+        """!Configures the container.
+            @param event: event that will be handled with this callback.
+        """
         size = (self.container.winfo_reqwidth(), self.container.winfo_reqheight())
         self.canvas.config(scrollregion="0 0 {} {}".format(*size))
         if self.container.winfo_reqwidth() != self.canvas.winfo_width():
@@ -66,6 +69,9 @@ class ScrolledFrame(tk.Frame):
             self.canvas.config(height=self.container.winfo_reqheight())
 
     def _configure_canvas(self, event):
+        """!Configures the canvas height.
+            @param event: event that will be handled with this callback.
+        """
         if self.container.winfo_reqwidth() != self.canvas.winfo_width():
             self.canvas.itemconfigure(
                 self.container_id, width=self.canvas.winfo_width()
