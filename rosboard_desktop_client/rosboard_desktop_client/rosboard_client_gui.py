@@ -21,7 +21,6 @@ import tkinter as tk
 from functools import partial
 from pathlib import Path
 from threading import Thread
-from tkinter import *
 
 from icmplib import ping
 from socket import socket, AF_INET, SOCK_STREAM
@@ -111,7 +110,7 @@ class Application:
         label1.grid(row=1, column=0, columnspan=2, sticky="ew")
 
         self.entry = tk.Entry(self.frame_conf)
-        self.entry.insert(END, "localhost:8888")
+        self.entry.insert(tk.END, "localhost:8888")
         self.entry.grid(row=1, column=2, columnspan=3, sticky=tk.W + tk.E, padx=5)
 
         self.bt_conn = tk.Button(
@@ -123,7 +122,7 @@ class Application:
         self.bt_conn.grid(row=1, column=5, columnspan=2, sticky="ew")
 
         self.bt_alive = tk.Button(
-            self.frame_conf, text="STATUS", bg="#90EE90", state=DISABLED
+            self.frame_conf, text="STATUS", bg="#90EE90", state=tk.DISABLED
         )
         # Light green #90EE90
         # Grey #D3D3D3
@@ -222,9 +221,9 @@ class Application:
 
                 # Configures the interface depending on server result
                 if is_alive:
-                    self.bt_conn.config(state=NORMAL)
+                    self.bt_conn.config(state=tk.NORMAL)
                 else:
-                    self.bt_conn.config(state=DISABLED)
+                    self.bt_conn.config(state=tk.DISABLED)
 
                 conn_test_count = 0
 
@@ -235,7 +234,7 @@ class Application:
             else:
 
                 # Disables connection button
-                self.bt_conn.config(state=DISABLED)
+                self.bt_conn.config(state=tk.DISABLED)
 
                 # Get the roundtrip value from the server
                 ping_response_val = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
