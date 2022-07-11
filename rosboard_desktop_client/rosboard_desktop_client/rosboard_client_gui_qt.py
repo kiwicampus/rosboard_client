@@ -8,7 +8,7 @@ from icmplib import ping
 from time import time, sleep
 from threading import Thread
 from psutil import cpu_percent, net_io_counters
-from socket import socket, AF_INET, SOCK_STREAM
+from socket import socket, AF_INET, SOCK_STREAM, gaierror
 
 from functools import partial
 from PyQt5.QtCore import Qt, QTimer
@@ -227,12 +227,14 @@ class RosboardClientGui(QMainWindow):
         ip_addr, port = self.connection_widget.get_connection_address()
         try:
             test_socket = socket(AF_INET, SOCK_STREAM)
-            test_socket.settimeout(0.5)
+            test_socket.settimeout(0.1)
             is_avail = test_socket.connect_ex((ip_addr, int(port))) == 0
             self.connection_widget.set_buttons_status(is_avail, self.is_connected)
             test_socket.close()
         except ValueError as e:
-            pass
+            is_avail = False
+        except gaierror as e:
+            is_avail = False
 
     def connect_to_server(self):
         ip_addr, port = self.connection_widget.get_connection_address()
