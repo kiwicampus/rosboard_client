@@ -5,6 +5,8 @@ import rclpy
 from rclpy.node import Node
 
 from icmplib import ping
+from time import time, sleep
+from threading import Thread
 from psutil import cpu_percent, net_io_counters
 from socket import socket, AF_INET, SOCK_STREAM
 
@@ -13,19 +15,130 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox
 
 from rosboard_desktop_client.networking import RosboardClient
+from rosboard_desktop_client.republishers import PublisherManager
+
+
+class TopicHandler:
+    def __init__(self, topic_name, client, node: Node):
+
+        self.client = client
+        
+        # Store the topic name
+        self.topic_name = topic_name
+        self.has_header = False
+        self.rate = 0.0
+        self.avg_rate = 0.0
+        self.latency = 0.0
+        self.latency_list = []
+        self.rate_list = []
+        self.state = "NO_DATA"
+
+        # Get the topic message type and create republisher
+        message_type = client.get_topic_type(topic_name)
+        default_publisher = PublisherManager.getDefaultPublisherForType(message_type)
+        self.republisher = default_publisher(
+            parent_node=node, topic_name=topic_name, topic_class_name=message_type
+        )
+        self.client.create_socket_subscription(
+            message_type, topic_name, self.topic_callback
+        )
+
+        # Define member variables to store values
+        self.n_msgs = 0
+        self.t_start = time()
+        self.t_last_msg = None
+        self.running = True
+
+        # Create timers to run auxiliary functions
+        th_state = Thread(target=self.define_node_state, daemon=True)
+        th_stats = Thread(target=self.calculate_stats, daemon=True)
+        th_state.start()
+        th_stats.start()
+
+    def close_connection(self):
+        rclpy.logging.get_logger("rosboard_desktop_client").info(f"Closing connection for {self.topic_name}")
+        self.client.destroy_socket_subscription(self.topic_name)
+        self.running = False
+
+    def define_node_state(self):
+        while self.running:
+            if self.t_last_msg is not None:
+                if time() - self.t_last_msg > 5.0:
+                    self.state = "NO_DATA"
+                elif self.rate < 0.8 * self.avg_rate:
+                    self.state = "DELAY"
+                else:
+                    self.state = "NORMAL"
+            sleep(1/250)
+
+    def calculate_stats(self):
+        while self.running:
+            t_average = self.calculate_average(self.rate_list)
+            if t_average != 0.0:
+                self.rate = 1.0 / t_average
+            else:
+                self.rate = 0.0
+
+            if self.has_header:
+                self.latency = self.calculate_average(self.latency_list)
+            sleep(0.05)
+
+    def calculate_average(self, time_list):
+        """!
+        Calculate the average rate using EWMA.
+        @param time_list: list with the last time delta values.
+        """
+        average = 0.0
+        list_size = len(time_list)
+        if list_size > 0:
+            average = time_list[0]
+            alpha = 2.0 / (list_size + 1.0)
+            c_alpha = 1.0 - alpha
+            if list_size > 1:
+                for indx in range(1, list_size):
+                    average = alpha * time_list[indx] + c_alpha * average
+        return average
+
+    def topic_callback(self, msg):
+        self.n_msgs += 1
+        t_current_msg = time()
+        
+        if self.t_last_msg is not None:
+            if self.has_header:
+                t_send = self.timestamp_to_secs(msg[1]["header"]["stamp"])
+                self.latency_list.append(t_current_msg - t_send)
+                self.latency_list = self.latency_list[-20:]
+            
+            self.rate_list.append(t_current_msg - self.t_last_msg)
+            self.rate_list = self.rate_list[-20:]
+
+        else:
+            self.has_header = "header" in msg[1].keys()
+
+        # Always execute this code block
+        self.t_last_msg = t_current_msg
+        self.republisher.parse_and_publish(msg)
+
+    def timestamp_to_secs(self, header_stamp):
+        secs = header_stamp["sec"]
+        nanosecs = header_stamp["nanosec"]
+        return secs + nanosecs * 10 ** -9
+
+    def get_topic_stats(self):
+        return [self.rate, self.latency, self.has_header]
+
 
 class RosboardClientGui(QMainWindow):
 
     def __init__(self):
         super(QMainWindow, self).__init__()
 
-        # Create the node 
-        self.node = Node("rosboard_desktop_gui")
-
         # Relevant variables
+        self.node = Node("rosboard_desktop_gui")
         self.client = None
         self.server_ip_addr = None
         self.is_connected = False
+        self.topic_handlers = []
 
         # Main window configurations
         self.setWindowTitle("Rosboard Client GUI")
@@ -83,6 +196,10 @@ class RosboardClientGui(QMainWindow):
         conn_timer.timeout.connect(self.check_websocket_status)
         conn_timer.start(100)
 
+        # Create a timer to update the topic stats
+        self.topic_stats_timer = QTimer(self)
+        self.topic_stats_timer.timeout.connect(self.update_topic_stats_and_state)
+
     def update_cpu_usage(self):
         self.cpu_usage = cpu_percent()
 
@@ -127,27 +244,52 @@ class RosboardClientGui(QMainWindow):
         )
 
         # Get topics list and add them to interface
+        self.topic_handlers = []
         topics_list = self.client.get_available_topics()
         for topic in topics_list:
             self.topics_list_widget.add_topic(topic)
+
+        # Start the timer to update topics
+        self.topic_stats_timer.start(250)
 
         self.connection_widget.toggle_edits(False)
         self.server_ip_addr = ip_addr
         self.is_connected = True
 
     def disconnect_from_server(self):
+        self.topic_stats_timer.stop()
         self.client = None
+        for th in self.topic_handlers:
+            self.topic_handlers.remove(th)
+        self.topics_list_widget.remove_all_topics()
+        self.topics_panel_widget.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.is_connected = False
 
     def add_topic_to_panel(self, topic_name):
+        self.topic_handlers.append(TopicHandler(topic_name, self.client, self.node))
         self.topics_list_widget.remove_topic(topic_name)
         self.topics_panel_widget.add_topic(topic_name)
 
     def add_topic_to_list(self, topic_name):
+        
+        for topic_handler in self.topic_handlers:
+            if topic_handler.topic_name == topic_name:
+                topic_handler.close_connection()
+                self.topic_handlers.remove(topic_handler)
+                break
         self.topics_panel_widget.remove_topic(topic_name)
         self.topics_list_widget.add_topic(topic_name)
 
+    def update_topic_stats_and_state(self):
+        topic_stats = {}
+        topic_state = {}
+        for th in self.topic_handlers:
+            topic_stats[th.topic_name] = th.get_topic_stats()
+            topic_state[th.topic_name] = th.state
+        self.topics_panel_widget.update_topic_stats(topic_stats)
+        self.topics_panel_widget.update_topic_state(topic_state)
+        
 
 class ConnectionWidget(QWidget):
     """!
@@ -206,6 +348,9 @@ class ConnectionWidget(QWidget):
 class StatsWidget(QWidget):
     """!
     Widget that contains elements to show the stats for the user.
+    The stats consist of the CPU usage represented as a percentage,
+    the round trip time to the connected socket, and the current
+    download speed.
     """
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
@@ -269,12 +414,17 @@ class TopicsListWidget(QWidget):
 
     def remove_topic(self, topic_name):
         """!
-        Remove the last added button of the topic list.
+        Remove a topic button from the list.
         """
         for button in self.topic_btns:
             if button.text() == topic_name:
                 self.topic_btns.remove(button)
                 button.deleteLater()
+
+    def remove_all_topics(self):
+        topic_names = [btn.text() for btn in self.topic_btns]
+        for tn in topic_names:
+            self.remove_topic(tn)
 
 
 class TopicsPanelWidget(QWidget):
@@ -287,15 +437,12 @@ class TopicsPanelWidget(QWidget):
         # Define the layout for the widget
         self.ly_widget = QGridLayout()
 
-        # 
-        topics_gb = QGroupBox()
-        topics_gb.setLayout(self.ly_widget)
-        
         # Create the scroll area
+        topics_gb = QGroupBox()
+        topics_gb.setLayout(self.ly_widget)        
         scroll_area = QScrollArea()
         scroll_area.setWidget(topics_gb)
         scroll_area.setWidgetResizable(True)
-        
         ly_main = QVBoxLayout()
         ly_main.addWidget(scroll_area)
         self.setLayout(ly_main)
@@ -315,6 +462,21 @@ class TopicsPanelWidget(QWidget):
                 topic_wg.deleteLater()
         self.configure_panel()
 
+    def remove_all_topics(self):
+        topic_names = [topic_wg.topic_name for topic_wg in self.widgets_list]
+        for tn in topic_names:
+            self.remove_topic(tn)
+
+    def update_topic_stats(self, topic_stats):
+        for widget in self.widgets_list:
+            stats = topic_stats[widget.topic_name]
+            widget.update_topic_stats(stats[0], stats[1], stats[2])
+
+    def update_topic_state(self, topic_state):
+        for widget in self.widgets_list:
+            state = topic_state[widget.topic_name]
+            widget.update_topic_state(state)
+
     def configure_panel(self):
         count = 0
         for widget in self.widgets_list:
@@ -324,7 +486,9 @@ class TopicsPanelWidget(QWidget):
 
 class TopicWidget(QWidget):
     """!
-    Widget that will show the topic information.
+    Widget that will show the topic information. The widget includes the
+    topic name, received frequency and time delay.
+    @param topic_name "str"
     """
     def __init__(self, parent, topic_name):
         super(QWidget, self).__init__(parent)
@@ -347,15 +511,31 @@ class TopicWidget(QWidget):
         ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
         ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
         ly_widget.addWidget(bt_close, 0, 2, 3, 1)
-
         self.setLayout(ly_widget)
+
+    def update_topic_stats(self, frequency, latency, has_latency=True):
+        """!
+        Update the topic statistics: frequency and latency.
+        @param frequency "float" value.
+        @param latency "float" value.
+        """
+        self.freq_lb.setText(f"{frequency:3.2f}")
+        if has_latency:
+            self.latency_lb.setText(f"{latency * 1000:3.2f}")
+        else:
+            self.latency_lb.setText("N/A")
+
+    def update_topic_state(self, state):
+        if state == "DELAY":
+            self.setStyleSheet("background: red;")
+        elif state == "NORMAL":
+            self.setStyleSheet("background: green;")
+        else:
+            self.setStyleSheet("background: gray;")
 
 
 def main():
-    # 
     rclpy.init(args=sys.argv)
-
-
     app = QApplication(sys.argv)
     ui = RosboardClientGui()
     ui.showMaximized()
