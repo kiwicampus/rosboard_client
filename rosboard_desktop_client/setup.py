@@ -20,7 +20,7 @@ setup(
     entry_points={
         "console_scripts": [
             "rosboard_client = rosboard_desktop_client.rosboard_client:main",
-            "rosboard_client_gui = rosboard_desktop_client.rosboard_client_gui:main",
+            "rosboard_client_gui = rosboard_desktop_client.rosboard_client_gui_qt:main",
         ],
     },
 )
