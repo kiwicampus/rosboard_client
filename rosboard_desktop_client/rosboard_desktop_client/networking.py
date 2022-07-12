@@ -146,12 +146,15 @@ class RosboardClientProtocol(WebSocketClientProtocol):
     """! Class specifying the rosboard client websocket protocol.
     Inherits from the WebSocketClientProtocol from twisted
     """
+    # Define a flag to indicate the protocol status
+    is_connected = False
 
     def onConnect(self, response) -> None:
         """!
         Function run when the websocket is successfully connected
         @param response the connection response
         """
+        RosboardClientProtocol.is_connected = True
         self.factory.logger.info(f"Server connected: {response.peer}")
 
     def onOpen(self) -> None:
@@ -159,6 +162,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         Function run when the connection is open. This sets
         the protocol object in the factory using this class
         """
+        RosboardClientProtocol.is_connected = True
         self.factory.logger.info(f"Communication opened")
         self.factory.ready(self)
 
@@ -166,6 +170,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         """!
         Function run when the connection is closed
         """
+        RosboardClientProtocol.is_connected = False
         self.factory.logger.warning(
             f"Communication closed. reason: {reason} was clean: {wasClean}, code: {code}"
         )
@@ -209,7 +214,11 @@ class RosboardClientProtocol(WebSocketClientProtocol):
 
 
 class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
+    
     protocol = RosboardClientProtocol
+
+    # Reconnecting client factory configs
+    maxDelay = 2.0
 
     def __init__(self, host: str, connection_timeout: float):
         """! Class containing the socket client to connect to the rosboard server
@@ -221,7 +230,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             Exception: In case the server did not send the available topic within the timeout
         """
         self.logger = logging.getLogger("rosboard_client")
-
+        self.is_connected = False
         self.socket_subscriptions = {}
         self.available_topics = {}
 
@@ -248,6 +257,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         connection_request_time = time.time()
         while self._proto is None:
             time.sleep(0.05)
+            self.is_connected = True
             if time.time() - connection_request_time > connection_timeout:
                 self.logger.error(f"Connection attempt to {socket_url} timed out")
                 raise Exception("Connection timed out")
@@ -365,6 +375,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         Raises:
             Exception: Always raises an exception, the connection with the server should not be lost
         """
+        self.is_connected = False
         self.logger.error(f"Lost connection with {self.url}, reason: {reason}")
         ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
@@ -374,5 +385,6 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         Raises:
             Exception: Always raises an exception. Connection should not fail
         """
+        self.is_connected = False
         self.logger.error(f"Failed to connect to {self.url}, reason: {reason}")
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
