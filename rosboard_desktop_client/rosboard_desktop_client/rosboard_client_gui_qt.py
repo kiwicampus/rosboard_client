@@ -12,7 +12,7 @@ from socket import socket, AF_INET, SOCK_STREAM, gaierror
 
 from functools import partial
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox, QSizePolicy
 
 from rosboard_desktop_client.networking import RosboardClient
 from rosboard_desktop_client.republishers import PublisherManager
@@ -138,6 +138,7 @@ class RosboardClientGui(QMainWindow):
         self.client = None
         self.server_ip_addr = None
         self.is_connected = False
+        self.retry_connection = False
         self.topic_handlers = []
 
         # Main window configurations
@@ -199,6 +200,43 @@ class RosboardClientGui(QMainWindow):
         # Create a timer to update the topic stats
         self.topic_stats_timer = QTimer(self)
         self.topic_stats_timer.timeout.connect(self.update_topic_stats_and_state)
+
+        # Timer that checks the connection status to handle closures
+        networking_timer = QTimer(self)
+        networking_timer.timeout.connect(self.check_connection_status)
+        networking_timer.start(500)
+
+    def check_connection_status(self):
+        if self.client is not None:
+            self.is_connected = self.client.protocol.is_connected
+            if self.retry_connection and self.is_connected:
+                self.restore_interface()
+                self.retry_connection = False
+            else:
+                self.retry_connection = not self.is_connected
+
+    def restore_interface(self):
+        """!
+        Restore the interface to the current state.
+        """
+        self.node.get_logger().info("Restoring interface after reconnection.")
+        # Get current topics to restore them later.
+        current_topics = []
+        for tw in self.topics_panel_widget.widgets_list:
+            current_topics.append(tw.topic_name)
+        # Delete the topic handlers # TODO: convert this into a function. SRP.
+        for th in self.topic_handlers:
+            self.topic_handlers.remove(th)
+        # Clean the interface
+        self.topics_list_widget.remove_all_topics()
+        self.topics_panel_widget.remove_all_topics()
+        # Configure the interface
+        available_topics = self.client.get_available_topics()
+        for topic in available_topics:
+            self.topics_list_widget.add_topic(topic)
+        for topic in current_topics:
+            self.add_topic_to_panel(topic)
+        
 
     def update_cpu_usage(self):
         self.cpu_usage = cpu_percent()
@@ -413,6 +451,7 @@ class TopicsListWidget(QWidget):
         bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic_name))
         self.topic_btns.append(bt_topic)
         self.ly_topics.addWidget(self.topic_btns[-1])
+        self.ly_topics.addStretch()
 
     def remove_topic(self, topic_name):
         """!
@@ -445,6 +484,7 @@ class TopicsPanelWidget(QWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidget(topics_gb)
         scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("background: blue;")
         ly_main = QVBoxLayout()
         ly_main.addWidget(scroll_area)
         self.setLayout(ly_main)
@@ -506,20 +546,28 @@ class TopicWidget(QWidget):
             self.topic_name
         ))
 
+        lb_name = QLabel(self.topic_name)
+
         ly_widget = QGridLayout()
-        ly_widget.addWidget(QLabel(self.topic_name), 0, 0, 1, 2)
-        ly_widget.addWidget(QLabel("Freq. [Hz]:"), 1, 0)
-        ly_widget.addWidget(QLabel("DT [ms]:"), 2, 0)
-        ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
-        ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
-        ly_widget.addWidget(bt_close, 0, 2, 3, 1)
+        ly_widget.setSpacing(0)
+        ly_widget.addWidget(lb_name, 1, 0, 1, 2)
+        ly_widget.addWidget(QLabel("Freq. [Hz]:"), 2, 0)
+        ly_widget.addWidget(QLabel("DT [ms]:"), 3, 0)
+        ly_widget.addWidget(self.freq_lb, 2, 1, Qt.AlignRight)
+        ly_widget.addWidget(self.latency_lb, 3, 1, Qt.AlignRight)
+        ly_widget.addWidget(bt_close, 0, 0, 1, 2)
         self.setLayout(ly_widget)
+
+        self.setContentsMargins(0,0,0,0)
+
 
     def update_topic_stats(self, frequency, latency, has_latency=True):
         """!
         Update the topic statistics: frequency and latency.
         @param frequency "float" value.
         @param latency "float" value.
+        @param has_latency "bool" flag to indicate wheter the topic has 
+        latency calculations or not.
         """
         self.freq_lb.setText(f"{frequency:3.2f}")
         if has_latency:
@@ -528,6 +576,10 @@ class TopicWidget(QWidget):
             self.latency_lb.setText("N/A")
 
     def update_topic_state(self, state):
+        """!
+        Update the node element color depending on topic state.
+        @param state "str" represent the received messages values for topic.
+        """
         if state == "DELAY":
             self.setStyleSheet("background: red;")
         elif state == "NORMAL":
