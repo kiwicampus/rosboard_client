@@ -1,4 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# =============================================================================
+"""
+Code Information:
+    Code Information: PyQt5 user interface for the rosboard client.
+    Maintainer: Nicolas Rocha Pacheco
+	Mail: nicolas.rocha@kiwibot.com
+"""
 
+# =============================================================================
 import sys
 
 import rclpy
@@ -12,7 +22,7 @@ from socket import socket, AF_INET, SOCK_STREAM, gaierror
 
 from functools import partial
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox, QSizePolicy
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox, QMessageBox
 
 from rosboard_desktop_client.networking import RosboardClient
 from rosboard_desktop_client.republishers import PublisherManager
@@ -217,7 +227,7 @@ class RosboardClientGui(QMainWindow):
 
     def restore_interface(self):
         """!
-        Restore the interface to the current state.
+        Restore the interface to the current state after a reconnection.
         """
         self.node.get_logger().info("Restoring interface after reconnection.")
         # Get current topics to restore them later.
@@ -236,7 +246,6 @@ class RosboardClientGui(QMainWindow):
             self.topics_list_widget.add_topic(topic)
         for topic in current_topics:
             self.add_topic_to_panel(topic)
-        
 
     def update_cpu_usage(self):
         self.cpu_usage = cpu_percent()
@@ -307,9 +316,16 @@ class RosboardClientGui(QMainWindow):
         self.is_connected = False
 
     def add_topic_to_panel(self, topic_name):
-        self.topic_handlers.append(TopicHandler(topic_name, self.client, self.node))
-        self.topics_list_widget.remove_topic(topic_name)
-        self.topics_panel_widget.add_topic(topic_name)
+        try:
+            self.topic_handlers.append(TopicHandler(topic_name, self.client, self.node))
+            self.topics_list_widget.remove_topic(topic_name)
+            self.topics_panel_widget.add_topic(topic_name)
+        except ModuleNotFoundError as e:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Warning)
+            msg.setText("Can not load topic message type!")
+            msg.setWindowTitle("Can not load message!")
+            msg.exec_()
 
     def add_topic_to_list(self, topic_name):
         
