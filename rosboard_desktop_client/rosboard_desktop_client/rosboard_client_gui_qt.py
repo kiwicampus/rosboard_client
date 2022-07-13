@@ -507,11 +507,15 @@ class TopicsListWidget(QWidget):
         Add a button to the topic list in the panel.
         @param topic_name "str" name of the topic that will be linked to the button. 
         """
-        bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic_name))
-        self.topic_btns.append(bt_topic)
-        self.ly_topics.addWidget(self.topic_btns[-1])
-        self.ly_topics.addStretch()
+        current_topics = [bt.text() for bt in self.topic_btns]
+        self.remove_all_topics()
+        current_topics.append(topic_name)
+        current_topics = sorted(current_topics)
+        for topic in current_topics:
+            bt_topic = QPushButton(topic)
+            bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic))
+            self.topic_btns.append(bt_topic)
+            self.ly_topics.addWidget(self.topic_btns[-1])
 
     def remove_topic(self, topic_name):
         """!
