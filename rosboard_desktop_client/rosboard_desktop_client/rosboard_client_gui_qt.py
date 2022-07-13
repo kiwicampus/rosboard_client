@@ -202,11 +202,6 @@ class RosboardClientGui(QMainWindow):
         stats_timer.timeout.connect(self.update_stats)
         stats_timer.start(250)
 
-        # Create the timer to update the connection buttons
-        self.check_connection_timer = QTimer(self)
-        self.check_connection_timer.timeout.connect(self.check_websocket_status)
-        self.check_connection_timer.start(100)
-
         # Create a timer to update the topic stats
         self.topic_stats_timer = QTimer(self)
         self.topic_stats_timer.timeout.connect(self.update_topic_stats_and_state)
@@ -215,6 +210,13 @@ class RosboardClientGui(QMainWindow):
         networking_timer = QTimer(self)
         networking_timer.timeout.connect(self.check_connection_status)
         networking_timer.start(500)
+
+    def show_warning_message(self, title, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText(message)
+        msg.setWindowTitle(title)
+        msg.exec_()
 
     def check_connection_status(self):
         if self.client is not None:
@@ -270,86 +272,59 @@ class RosboardClientGui(QMainWindow):
             self.download_speed
         )
 
-    def check_websocket_status(self):
+    def test_connection(self):
         """!
-        Callback for checking the websocket status and enabling the connect button.
-        """
-        ip_addr, port = self.connection_widget.get_connection_address()
-        if self.check_ip_address_valid(ip_addr) or ip_addr == "localhost" and self.check_port_valid(port):
-            try:
-                test_socket = socket(AF_INET, SOCK_STREAM)
-                test_socket.settimeout(0.5)
-                is_avail = test_socket.connect_ex((ip_addr, int(port))) == 0
-                self.connection_widget.set_buttons_status(is_avail, self.is_connected)
-                test_socket.close()
-            except ValueError as e:
-                is_avail = False
-            except gaierror as e:
-                is_avail = False
-        else:
-            self.node.get_logger().info("WS not valid. Abort testing.")
-
-    def check_ip_address_valid(self, ip_address: str) -> bool:
-        """!
-        Check that the given IP address is valid.
-        @param "str" IP address that will be tested.
-        """
-        ip_address = ip_address.split('.')
-        if len(ip_address) != 4:
-            return False
-        else:
-            for ip_val in ip_address:
-                if not self.check_ip_value_valid(ip_val):
-                    return False
-            return True
-
-    def check_ip_value_valid(self, ip_value: str) -> bool:
-        """!
-        Check that an IP address field is valid.
-        @param ip_value "str" value that will be tested.
+        Check the websocket status and enable the connect button.
         """
         try:
-            return int(ip_value) >= 0 and int(ip_value) <= 255
+            ip_addr, port = self.connection_widget.get_connection_address()
+            test_socket = socket(AF_INET, SOCK_STREAM)
+            test_socket.settimeout(1.0)
+            is_avail = test_socket.connect_ex((ip_addr, int(port))) == 0
+            test_socket.close()
+            if not is_avail:
+                self.show_warning_message(
+                    "Can not connect to server!",
+                    "Connection error!"
+                )
+            return is_avail
         except ValueError as e:
+            self.show_warning_message(
+                "Target web socket is not enabled. Is the port correct?",
+                "Target web socket is not enabled!"
+            )
             return False
-
-    def check_port_valid(self, port: str) -> bool:
-        """!
-        Check if a port is valid.
-        @param port "str" port value that will be tested.
-        """
-        try:
-            return int(port) >= 1 and int(port) <= 65535
-        except ValueError as ve:
+        except gaierror as e:
+            self.show_warning_message(
+                "Target web socket is not enabled!",
+                "Target web socket is not enabled. Is the address correct?"
+            )
             return False
 
     def connect_to_server(self):
-        ip_addr, port = self.connection_widget.get_connection_address()
+        if self.test_connection():
+            ip_addr, port = self.connection_widget.get_connection_address()
 
-        # Connect to client
-        self.client = RosboardClient(
-            host=f"{ip_addr}:{port}", 
-            connection_timeout=5.0
-        )
+            # Connect to client
+            self.client = RosboardClient(
+                host=f"{ip_addr}:{port}", 
+                connection_timeout=5.0
+            )
 
-        # Get topics list and add them to interface
-        self.topic_handlers = []
-        topics_list = self.client.get_available_topics()
-        for topic in topics_list:
-            self.topics_list_widget.add_topic(topic)
+            # Get topics list and add them to interface
+            self.topic_handlers = []
+            topics_list = self.client.get_available_topics()
+            for topic in topics_list:
+                self.topics_list_widget.add_topic(topic)
 
-        # Start the timer to update topics
-        self.topic_stats_timer.start(250)
-        # Stop timer to check connection
-        self.check_connection_timer.stop()
-
-        self.connection_widget.toggle_edits(False)
-        self.server_ip_addr = ip_addr
-        self.is_connected = True
-        self.connection_widget.set_buttons_status(True, self.is_connected)
+            # Start the timer to update topics
+            self.server_ip_addr = ip_addr
+            self.is_connected = True
+            self.topic_stats_timer.start(250)
+            self.connection_widget.set_buttons_status(self.is_connected)
+            self.connection_widget.toggle_edits(False)
 
     def disconnect_from_server(self):
-        self.check_connection_timer.start(100)
         self.topic_stats_timer.stop()
         self.client = None
         for th in self.topic_handlers:
@@ -358,6 +333,7 @@ class RosboardClientGui(QMainWindow):
         self.topics_panel_widget.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.is_connected = False
+        self.connection_widget.set_buttons_status(self.is_connected)
 
     def add_topic_to_panel(self, topic_name):
         try:
@@ -408,7 +384,7 @@ class ConnectionWidget(QWidget):
 
         # Create the buttons for connecting and disconnecting the buttons
         self.connect_bt = QPushButton("CONNECT")
-        self.connect_bt.setEnabled(False)
+        self.connect_bt.setEnabled(True)
         self.disconnect_bt = QPushButton("DISCONNECT")
         self.disconnect_bt.setEnabled(False)
 
@@ -436,13 +412,13 @@ class ConnectionWidget(QWidget):
         port = self.port_le.text()
         return ip_address, port
 
+    def set_buttons_status(self, is_connected):
+        self.connect_bt.setEnabled(not is_connected)
+        self.disconnect_bt.setEnabled(is_connected)
+
     def toggle_edits(self, enabled):
         self.ip_address_le.setEnabled(enabled)
         self.port_le.setEnabled(enabled)
-
-    def set_buttons_status(self, is_avail, is_connected):
-        self.connect_bt.setEnabled(is_avail and not is_connected)
-        self.disconnect_bt.setEnabled(is_connected)
 
 
 class StatsWidget(QWidget):
@@ -527,6 +503,9 @@ class TopicsListWidget(QWidget):
                 button.deleteLater()
 
     def remove_all_topics(self):
+        """!
+        Remove all topics from widget.
+        """
         topic_names = [btn.text() for btn in self.topic_btns]
         for tn in topic_names:
             self.remove_topic(tn)
