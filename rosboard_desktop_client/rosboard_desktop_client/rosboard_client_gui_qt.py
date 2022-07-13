@@ -203,9 +203,9 @@ class RosboardClientGui(QMainWindow):
         stats_timer.start(250)
 
         # Create the timer to update the connection buttons
-        conn_timer = QTimer(self)
-        conn_timer.timeout.connect(self.check_websocket_status)
-        conn_timer.start(100)
+        self.check_connection_timer = QTimer(self)
+        self.check_connection_timer.timeout.connect(self.check_websocket_status)
+        self.check_connection_timer.start(100)
 
         # Create a timer to update the topic stats
         self.topic_stats_timer = QTimer(self)
@@ -271,17 +271,57 @@ class RosboardClientGui(QMainWindow):
         )
 
     def check_websocket_status(self):
+        """!
+        Callback for checking the websocket status and enabling the connect button.
+        """
         ip_addr, port = self.connection_widget.get_connection_address()
+        if self.check_ip_address_valid(ip_addr) or ip_addr == "localhost" and self.check_port_valid(port):
+            try:
+                test_socket = socket(AF_INET, SOCK_STREAM)
+                test_socket.settimeout(0.5)
+                is_avail = test_socket.connect_ex((ip_addr, int(port))) == 0
+                self.connection_widget.set_buttons_status(is_avail, self.is_connected)
+                test_socket.close()
+            except ValueError as e:
+                is_avail = False
+            except gaierror as e:
+                is_avail = False
+        else:
+            self.node.get_logger().info("WS not valid. Abort testing.")
+
+    def check_ip_address_valid(self, ip_address: str) -> bool:
+        """!
+        Check that the given IP address is valid.
+        @param "str" IP address that will be tested.
+        """
+        ip_address = ip_address.split('.')
+        if len(ip_address) != 4:
+            return False
+        else:
+            for ip_val in ip_address:
+                if not self.check_ip_value_valid(ip_val):
+                    return False
+            return True
+
+    def check_ip_value_valid(self, ip_value: str) -> bool:
+        """!
+        Check that an IP address field is valid.
+        @param ip_value "str" value that will be tested.
+        """
         try:
-            test_socket = socket(AF_INET, SOCK_STREAM)
-            test_socket.settimeout(0.1)
-            is_avail = test_socket.connect_ex((ip_addr, int(port))) == 0
-            self.connection_widget.set_buttons_status(is_avail, self.is_connected)
-            test_socket.close()
+            return int(ip_value) >= 0 and int(ip_value) <= 255
         except ValueError as e:
-            is_avail = False
-        except gaierror as e:
-            is_avail = False
+            return False
+
+    def check_port_valid(self, port: str) -> bool:
+        """!
+        Check if a port is valid.
+        @param port "str" port value that will be tested.
+        """
+        try:
+            return int(port) >= 1 and int(port) <= 65535
+        except ValueError as ve:
+            return False
 
     def connect_to_server(self):
         ip_addr, port = self.connection_widget.get_connection_address()
@@ -300,12 +340,16 @@ class RosboardClientGui(QMainWindow):
 
         # Start the timer to update topics
         self.topic_stats_timer.start(250)
+        # Stop timer to check connection
+        self.check_connection_timer.stop()
 
         self.connection_widget.toggle_edits(False)
         self.server_ip_addr = ip_addr
         self.is_connected = True
+        self.connection_widget.set_buttons_status(True, self.is_connected)
 
     def disconnect_from_server(self):
+        self.check_connection_timer.start(100)
         self.topic_stats_timer.stop()
         self.client = None
         for th in self.topic_handlers:
