@@ -375,12 +375,10 @@ class ConnectionWidget(QWidget):
         super(QWidget, self).__init__(parent)
 
         # Create the line edits for the IP Address and the port
-        self.ip_address_le = QLineEdit()
-        self.port_le = QLineEdit()
+        self.address_le = QLineEdit()
 
         # Define a default address
-        self.ip_address_le.setText("localhost")
-        self.port_le.setText("8888")
+        self.address_le.setText("localhost:8888")
 
         # Create the buttons for connecting and disconnecting the buttons
         self.connect_bt = QPushButton("CONNECT")
@@ -392,33 +390,38 @@ class ConnectionWidget(QWidget):
         self.connect_bt.clicked.connect(self.parent().connect_to_server)
         self.disconnect_bt.clicked.connect(self.parent().disconnect_from_server)
 
-        ip_addr_lb = QLabel("IP ADDRESS")
-        ip_addr_lb.adjustSize()
-
         # Define the widget layout
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
-        ly_widget.setContentsMargins(0, 0, 0, 0)
-        ly_widget.addWidget(ip_addr_lb, 0, 0, Qt.AlignHCenter)
-        ly_widget.addWidget(QLabel("PORT"), 0, 1, Qt.AlignHCenter)
-        ly_widget.addWidget(self.ip_address_le, 1, 0)
-        ly_widget.addWidget(self.port_le, 1, 1)
-        ly_widget.addWidget(self.connect_bt, 2, 0)
-        ly_widget.addWidget(self.disconnect_bt, 2, 1)
+        ly_widget.setContentsMargins(0, 0, 0, 0)        
+        ly_widget.addWidget(QLabel("ADDRESS:"), 0, 0, Qt.AlignRight)
+        ly_widget.addWidget(self.address_le, 0, 1, 1, 2)
+        ly_widget.addWidget(self.connect_bt, 2, 1)
+        ly_widget.addWidget(self.disconnect_bt, 2, 2)
         self.setLayout(ly_widget)
 
     def get_connection_address(self):
-        ip_address = self.ip_address_le.text()
-        port = self.port_le.text()
-        return ip_address, port
+        address = self.address_le.text()
+        address = address.split(':')
+        if len(address) == 2:
+            return address[0], address[1]
+        else:
+            return "", ""
 
-    def set_buttons_status(self, is_connected):
+    def set_buttons_status(self, is_connected: bool):
+        """!
+        Enables or disables the connection and disconnection buttons.
+        @param is_connected "bool" indicate if the GUI is connected or not.
+        """
         self.connect_bt.setEnabled(not is_connected)
         self.disconnect_bt.setEnabled(is_connected)
 
-    def toggle_edits(self, enabled):
-        self.ip_address_le.setEnabled(enabled)
-        self.port_le.setEnabled(enabled)
+    def toggle_edits(self, enabled: bool):
+        """!
+        Toggle the widget line edits to allow for changes or not.
+        @param enabled "bool" indicates if the line edits are enabled or not.
+        """
+        self.address_le.setEnabled(enabled)
 
 
 class StatsWidget(QWidget):
@@ -461,21 +464,28 @@ class TopicsListWidget(QWidget):
     """
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
+        self.setObjectName("TopicsListWidget")
 
         self.topic_btns = []
+
         self.ly_topics = QVBoxLayout()
+        self.ly_topics.setAlignment(Qt.AlignTop)
+        #self.ly_topics.setContentsMargins(0,0,0,0)
 
         # Create the group of topic buttons
         self.topics_gb = QGroupBox()
+        self.topics_gb.setObjectName("topics_gb")
+        self.topics_gb.setStyleSheet("background: red;")
         self.topics_gb.setLayout(self.ly_topics)
+        self.topics_gb.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
 
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.topics_gb)
         scroll_area.setWidgetResizable(True)
 
         ly_main = QVBoxLayout(self)
+        #ly_main.setContentsMargins(0,0,0,0)
         ly_main.addWidget(scroll_area)
-
         self.setLayout(ly_main)
 
     def add_topic(self, topic_name):
@@ -492,6 +502,7 @@ class TopicsListWidget(QWidget):
             bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic))
             self.topic_btns.append(bt_topic)
             self.ly_topics.addWidget(self.topic_btns[-1])
+            #self.ly_topics.addStretch()
 
     def remove_topic(self, topic_name):
         """!
@@ -523,11 +534,14 @@ class TopicsPanelWidget(QWidget):
 
         # Create the scroll area
         topics_gb = QGroupBox()
-        topics_gb.setLayout(self.ly_widget)        
+        topics_gb.setObjectName("topics_gb")
+        topics_gb.setLayout(self.ly_widget)
+        topics_gb.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
+
+
         scroll_area = QScrollArea()
         scroll_area.setWidget(topics_gb)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("background: blue;")
         ly_main = QVBoxLayout()
         ly_main.addWidget(scroll_area)
         self.setLayout(ly_main)
