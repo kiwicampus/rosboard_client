@@ -593,7 +593,7 @@ class TopicWidget(QWidget):
         # TODO: remove stylesheet and add to .qss file.
         #self.setAutoFillBackground(True)
         self.setAttribute(Qt.WA_StyledBackground)
-        self.setStyleSheet("QWidget#TopicWidget {border: 1px solid black;}")
+        self.setStyleSheet("QWidget#TopicWidget {border: 2px solid black;}")
 
         self.topic_name = topic_name
 
@@ -638,11 +638,11 @@ class TopicWidget(QWidget):
         @param state "str" represent the received messages values for topic.
         """
         if state == "DELAY":
-            self.setStyleSheet("QWidget#TopicWidget{background: red;}")
+            self.setStyleSheet("QWidget#TopicWidget{border: 2px solid black; background: red;}")
         elif state == "NORMAL":
-            self.setStyleSheet("QWidget#TopicWidget{background: green;}")
+            self.setStyleSheet("QWidget#TopicWidget{border: 2px solid black; background: green;}")
         else:
-            self.setStyleSheet("QWidget#TopicWidget{background: gray;}")
+            self.setStyleSheet("QWidget#TopicWidget{border: 2px solid black; background: gray;}")
 
 
 def main():
