@@ -470,12 +470,10 @@ class TopicsListWidget(QWidget):
 
         self.ly_topics = QVBoxLayout()
         self.ly_topics.setAlignment(Qt.AlignTop)
-        #self.ly_topics.setContentsMargins(0,0,0,0)
 
         # Create the group of topic buttons
         self.topics_gb = QGroupBox()
         self.topics_gb.setObjectName("topics_gb")
-        self.topics_gb.setStyleSheet("background: red;")
         self.topics_gb.setLayout(self.ly_topics)
         self.topics_gb.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
 
@@ -484,7 +482,6 @@ class TopicsListWidget(QWidget):
         scroll_area.setWidgetResizable(True)
 
         ly_main = QVBoxLayout(self)
-        #ly_main.setContentsMargins(0,0,0,0)
         ly_main.addWidget(scroll_area)
         self.setLayout(ly_main)
 
@@ -502,7 +499,6 @@ class TopicsListWidget(QWidget):
             bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic))
             self.topic_btns.append(bt_topic)
             self.ly_topics.addWidget(self.topic_btns[-1])
-            #self.ly_topics.addStretch()
 
     def remove_topic(self, topic_name):
         """!
@@ -531,6 +527,7 @@ class TopicsPanelWidget(QWidget):
         
         # Define the layout for the widget
         self.ly_widget = QGridLayout()
+        self.ly_widget.setAlignment(Qt.AlignTop)
 
         # Create the scroll area
         topics_gb = QGroupBox()
@@ -542,6 +539,7 @@ class TopicsPanelWidget(QWidget):
         scroll_area = QScrollArea()
         scroll_area.setWidget(topics_gb)
         scroll_area.setWidgetResizable(True)
+
         ly_main = QVBoxLayout()
         ly_main.addWidget(scroll_area)
         self.setLayout(ly_main)
@@ -591,6 +589,11 @@ class TopicWidget(QWidget):
     """
     def __init__(self, parent, topic_name):
         super(QWidget, self).__init__(parent)
+        self.setObjectName("TopicWidget")
+        # TODO: remove stylesheet and add to .qss file.
+        #self.setAutoFillBackground(True)
+        self.setAttribute(Qt.WA_StyledBackground)
+        self.setStyleSheet("QWidget#TopicWidget {border: 1px solid black;}")
 
         self.topic_name = topic_name
 
@@ -615,9 +618,6 @@ class TopicWidget(QWidget):
         ly_widget.addWidget(bt_close, 0, 0, 1, 2)
         self.setLayout(ly_widget)
 
-        self.setContentsMargins(0,0,0,0)
-
-
     def update_topic_stats(self, frequency, latency, has_latency=True):
         """!
         Update the topic statistics: frequency and latency.
@@ -638,11 +638,11 @@ class TopicWidget(QWidget):
         @param state "str" represent the received messages values for topic.
         """
         if state == "DELAY":
-            self.setStyleSheet("background: red;")
+            self.setStyleSheet("QWidget#TopicWidget{background: red;}")
         elif state == "NORMAL":
-            self.setStyleSheet("background: green;")
+            self.setStyleSheet("QWidget#TopicWidget{background: green;}")
         else:
-            self.setStyleSheet("background: gray;")
+            self.setStyleSheet("QWidget#TopicWidget{background: gray;}")
 
 
 def main():
