@@ -401,8 +401,9 @@ class ConnectionWidget(QWidget):
         self.setLayout(ly_widget)
 
     def get_connection_address(self):
-        address = self.address_le.text()
+        address = self.address_le.text().strip("ws://")
         address = address.split(':')
+        print(address)
         if len(address) == 2:
             return address[0], address[1]
         else:
