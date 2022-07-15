@@ -315,7 +315,7 @@ class RosboardClientGui(QMainWindow):
             self.topic_handlers = []
             topics_list = self.client.get_available_topics()
             for topic in topics_list:
-                self.topics_list_widget.add_topic(topic)
+                self.topics_list_widget.add_topic_at_end(topic)
 
             # Start the timer to update topics
             self.server_ip_addr = ip_addr
@@ -401,9 +401,8 @@ class ConnectionWidget(QWidget):
         self.setLayout(ly_widget)
 
     def get_connection_address(self):
-        address = self.address_le.text().strip("ws://")
+        address = self.address_le.text().split("//")[-1]
         address = address.split(':')
-        print(address)
         if len(address) == 2:
             return address[0], address[1]
         else:
@@ -488,7 +487,7 @@ class TopicsListWidget(QWidget):
 
     def add_topic(self, topic_name):
         """!
-        Add a button to the topic list in the panel.
+        Add a button to the topic list in the panel in alphabetic order.
         @param topic_name "str" name of the topic that will be linked to the button. 
         """
         current_topics = [bt.text() for bt in self.topic_btns]
@@ -500,6 +499,16 @@ class TopicsListWidget(QWidget):
             bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic))
             self.topic_btns.append(bt_topic)
             self.ly_topics.addWidget(self.topic_btns[-1])
+
+    def add_topic_at_end(self, topic_name):
+        """!
+        add a button ot the topic list in the panel at its end.
+        @param topic_name "str" name of the topic that will be linked to the button.
+        """
+        bt_topic = QPushButton(topic_name)
+        bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic_name))
+        self.topic_btns.append(bt_topic)
+        self.ly_topics.addWidget(self.topic_btns[-1])
 
     def remove_topic(self, topic_name):
         """!
