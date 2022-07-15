@@ -193,9 +193,9 @@ class RosboardClientGui(QMainWindow):
         cpu_usage_timer.timeout.connect(self.update_cpu_usage)
         roundtrip_timer.timeout.connect(self.update_roundtrip)
         download_speed_timer.timeout.connect(self.update_download_speed)
-        cpu_usage_timer.start(100)
-        roundtrip_timer.start(100)
-        download_speed_timer.start(100)
+        cpu_usage_timer.start(250)
+        roundtrip_timer.start(250)
+        download_speed_timer.start(250)
 
         # Create a timer to update the stats panel
         stats_timer = QTimer(self)
@@ -263,7 +263,7 @@ class RosboardClientGui(QMainWindow):
         net_if_stats_val = net_io_counters()
         received_bytes = net_if_stats_val.bytes_recv - self.old_bytes_recv
         self.old_bytes_recv = net_if_stats_val.bytes_recv
-        self.download_speed = (received_bytes / 1024.0) / 0.5
+        self.download_speed = (received_bytes / 1024.0) / 0.25
 
     def update_stats(self):
         self.stats_widget.update_stats_widget(
