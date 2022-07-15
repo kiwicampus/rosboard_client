@@ -15,6 +15,7 @@ import threading
 import logging
 
 from twisted.internet import reactor
+from twisted.internet.error import ReactorAlreadyRunning
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from autobahn.twisted.websocket import (
@@ -249,8 +250,8 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self._proto = None
 
         # Run the reactor in a separate thread
-        self._thread = threading.Thread(target=reactor.run, args=(False,))
-        self._thread.daemon = True
+        self._thread = threading.Thread(target=self.run_reactor)
+        # self._thread.daemon = True
         self._thread.start()
 
         # Check if connection takes more than the timeout
@@ -272,6 +273,13 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
                 raise Exception("Available topics not received")
 
         self.logger.info("available topics advertised by server")
+
+    def run_reactor(self):
+        """! Function to start the reactor. Handles if the reactor is already running. """
+        try:
+            reactor.run(False)
+        except ReactorAlreadyRunning as e:
+            pass
 
     def create_socket_subscription(self, msg_type: str, topic: str, callback) -> None:
         """! Function to subscribe to a topic available in the rosboard server
