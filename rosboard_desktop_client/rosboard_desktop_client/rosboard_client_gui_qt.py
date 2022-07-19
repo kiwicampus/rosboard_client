@@ -159,7 +159,7 @@ class RosboardClientGui(QMainWindow):
         self.server_ip_addr = None
         self.is_connected = False
         self.retry_connection = False
-        self.topic_handlers = []
+        self.topic_handlers = {}
         self.available_topics = []
 
         # Main window configurations
@@ -259,8 +259,9 @@ class RosboardClientGui(QMainWindow):
         for tw in self.topics_panel_widget.widgets_list:
             current_topics.append(tw.topic_name)
         # Delete the topic handlers # TODO: convert this into a function. SRP.
-        for th in self.topic_handlers:
-            self.topic_handlers.remove(th)
+        for topic in self.topic_handlers.keys():
+            self.topic_handlers[topic].close_connection()
+            del self.topic_handlers[topic]
         # Clean the interface
         self.topics_list_widget.remove_all_topics()
         self.topics_panel_widget.remove_all_topics()
@@ -300,19 +301,14 @@ class RosboardClientGui(QMainWindow):
         """
         if self.is_connected:
             current_topics = self.client.get_available_topics()
-            handled_topics = [th.topic_name for th in self.topic_handlers]
+
+            # Remove topics from interface
             for topic in self.available_topics:
-                if topic in handled_topics:
-                    for topic_handler in self.topic_handlers:
-                        if topic_handler.topic_name == topic:
-                            topic_handler.close_connection()
-                            self.topic_handlers.remove(topic_handler)
-                            self.topics_panel_widget.remove_topic(topic)
-                            break
-                self.topics_list_widget.remove_topic(topic)
-                self.available_topics.remove(topic)
-                    
-            # Add new topics to list
+                if topic not in current_topics:
+                    self.topics_list_widget.remove_topic(topic)
+                    self.available_topics.remove(topic)
+
+            # Add new topics to interface
             for topic in current_topics:
                 if topic not in self.available_topics:
                     self.available_topics.append(topic)
@@ -360,7 +356,7 @@ class RosboardClientGui(QMainWindow):
             )
 
             # Get topics list and add them to interface
-            self.topic_handlers = []
+            self.topic_handlers = {}
             self.available_topics = self.client.get_available_topics()
             for topic in self.available_topics:
                 self.topics_list_widget.add_topic_at_end(topic)
@@ -378,8 +374,9 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer.stop()
         self.topic_stats_timer.stop()
         self.client = None
-        for th in self.topic_handlers:
-            self.topic_handlers.remove(th)
+        for topic in self.topic_handlers.keys():
+            self.topic_handlers[topic].close_connection()
+            del self.topic_handlers[topic]
         self.topics_list_widget.remove_all_topics()
         self.topics_panel_widget.remove_all_topics()
         self.connection_widget.toggle_edits(True)
@@ -388,7 +385,7 @@ class RosboardClientGui(QMainWindow):
 
     def add_topic_to_panel(self, topic_name):
         try:
-            self.topic_handlers.append(TopicHandler(topic_name, self.client, self.node))
+            self.topic_handlers[topic_name] = TopicHandler(topic_name, self.client, self.node)
             self.topics_list_widget.remove_topic(topic_name)
             self.topics_panel_widget.add_topic(topic_name)
         except ModuleNotFoundError as e:
@@ -399,21 +396,18 @@ class RosboardClientGui(QMainWindow):
             msg.exec_()
 
     def add_topic_to_list(self, topic_name):
-        
-        for topic_handler in self.topic_handlers:
-            if topic_handler.topic_name == topic_name:
-                topic_handler.close_connection()
-                self.topic_handlers.remove(topic_handler)
-                break
-        self.topics_panel_widget.remove_topic(topic_name)
+        if topic_name in self.topic_handlers.keys():
+            self.topic_handlers[topic_name].close_connection()
+            del self.topic_handlers[topic_name]
+            self.topics_panel_widget.remove_topic(topic_name)
         self.topics_list_widget.add_topic(topic_name)
 
     def update_topic_stats_and_state(self):
         topic_stats = {}
         topic_state = {}
-        for th in self.topic_handlers:
-            topic_stats[th.topic_name] = th.get_topic_stats()
-            topic_state[th.topic_name] = th.state
+        for topic in self.topic_handlers.keys():
+            topic_stats[topic] = self.topic_handlers[topic].get_topic_stats()
+            topic_state[topic] = self.topic_handlers[topic].state
         self.topics_panel_widget.update_topic_stats(topic_stats)
         self.topics_panel_widget.update_topic_state(topic_state)
         
