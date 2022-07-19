@@ -34,6 +34,9 @@ class TopicHandler:
     C_ALPHA = 1 - ALPHA
 
     def __init__(self, topic_name, client, node: Node):
+        """! Class to handle the node behavior.
+        @param topic_name "str" 
+        """
 
         self.client = client
         self.topic_name = topic_name
@@ -157,6 +160,7 @@ class RosboardClientGui(QMainWindow):
         self.is_connected = False
         self.retry_connection = False
         self.topic_handlers = []
+        self.available_topics = []
 
         # Main window configurations
         self.setWindowTitle("Rosboard Client GUI")
@@ -218,7 +222,16 @@ class RosboardClientGui(QMainWindow):
         networking_timer.timeout.connect(self.check_connection_status)
         networking_timer.start(500)
 
+        # Timer to update the available topics
+        self.topic_upd_timer = QTimer(self)
+        self.topic_upd_timer.timeout.connect(self.update_available_topics)
+
+
     def show_warning_message(self, title, message):
+        """! Function to generate a warning in the interface.
+        @param title "str" title for the warning.
+        @param message "str" content for the warning.
+        """
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
         msg.setText(message)
@@ -226,6 +239,8 @@ class RosboardClientGui(QMainWindow):
         msg.exec_()
 
     def check_connection_status(self):
+        """! Check the connection status of the client.
+        """
         if self.client is not None:
             self.is_connected = self.client.protocol.is_connected
             if self.retry_connection and self.is_connected:
@@ -279,6 +294,32 @@ class RosboardClientGui(QMainWindow):
             self.download_speed
         )
 
+    def update_available_topics(self):
+        """!
+        Updates the available topics in the list.
+        """
+        if self.is_connected:
+            current_topics = self.client.get_available_topics()
+            handled_topics = [th.topic_name for th in self.topic_handlers]
+            for topic in self.available_topics:
+                if topic in handled_topics:
+                    for topic_handler in self.topic_handlers:
+                        if topic_handler.topic_name == topic:
+                            topic_handler.close_connection()
+                            self.topic_handlers.remove(topic_handler)
+                            self.topics_panel_widget.remove_topic(topic)
+                            break
+                self.topics_list_widget.remove_topic(topic)
+                self.available_topics.remove(topic)
+                    
+            # Add new topics to list
+            for topic in current_topics:
+                if topic not in self.available_topics:
+                    self.available_topics.append(topic)
+                    self.add_topic_to_list(topic)
+        else:
+            pass
+
     def test_connection(self):
         """!
         Check the websocket status and enable the connect button.
@@ -320,18 +361,21 @@ class RosboardClientGui(QMainWindow):
 
             # Get topics list and add them to interface
             self.topic_handlers = []
-            topics_list = self.client.get_available_topics()
-            for topic in topics_list:
+            self.available_topics = self.client.get_available_topics()
+            for topic in self.available_topics:
                 self.topics_list_widget.add_topic_at_end(topic)
 
             # Start the timer to update topics
             self.server_ip_addr = ip_addr
             self.is_connected = True
             self.topic_stats_timer.start(250)
+            self.topic_upd_timer.start(5000)
             self.connection_widget.set_buttons_status(self.is_connected)
             self.connection_widget.toggle_edits(False)
 
     def disconnect_from_server(self):
+        self.available_topics = []
+        self.topic_upd_timer.stop()
         self.topic_stats_timer.stop()
         self.client = None
         for th in self.topic_handlers:
