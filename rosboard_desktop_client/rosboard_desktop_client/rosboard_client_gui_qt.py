@@ -29,11 +29,13 @@ from rosboard_desktop_client.republishers import PublisherManager
 
 
 class TopicHandler:
+
+    ALPHA = 2.0 / (20.0 + 1.0)
+    C_ALPHA = 1 - ALPHA
+
     def __init__(self, topic_name, client, node: Node):
 
         self.client = client
-        
-        # Store the topic name
         self.topic_name = topic_name
         self.has_header = False
         self.rate = 0.0
@@ -61,9 +63,7 @@ class TopicHandler:
 
         # Create timers to run auxiliary functions
         th_state = Thread(target=self.define_node_state, daemon=True)
-        th_stats = Thread(target=self.calculate_stats, daemon=True)
         th_state.start()
-        th_stats.start()
 
     def close_connection(self):
         rclpy.logging.get_logger("rosboard_desktop_client").info(f"Closing connection for {self.topic_name}")
@@ -79,37 +79,31 @@ class TopicHandler:
                     self.state = "DELAY"
                 else:
                     self.state = "NORMAL"
-            sleep(1/250)
-
-    def calculate_stats(self):
-        while self.running:
-            t_average = self.calculate_average(self.rate_list)
-            if t_average != 0.0:
-                self.rate = 1.0 / t_average
-            else:
-                self.rate = 0.0
-
-            if self.has_header:
-                self.latency = self.calculate_average(self.latency_list)
-            sleep(0.05)
+            sleep(0.25)
 
     def calculate_average(self, time_list):
         """!
-        Calculate the average rate using EWMA.
-        @param time_list: list with the last time delta values.
+        Calculate the exponentially weighted moving average.
+        @param time_list "list" contains the latest time values between messages.
+        @return "float" with the average value. Return 0.0 if time_list has no values.
         """
         average = 0.0
         list_size = len(time_list)
         if list_size > 0:
             average = time_list[0]
-            alpha = 2.0 / (list_size + 1.0)
-            c_alpha = 1.0 - alpha
             if list_size > 1:
                 for indx in range(1, list_size):
-                    average = alpha * time_list[indx] + c_alpha * average
+                    average = TopicHandler.ALPHA * time_list[indx] + TopicHandler.C_ALPHA * average
         return average
 
     def topic_callback(self, msg):
+        """!
+        Topic callback function for incoming rosboard messages.
+
+        This function processes the incoming messages in order to provide the
+        stats of the 
+
+        """
         self.n_msgs += 1
         t_current_msg = time()
         
@@ -129,12 +123,25 @@ class TopicHandler:
         self.t_last_msg = t_current_msg
         self.republisher.parse_and_publish(msg)
 
-    def timestamp_to_secs(self, header_stamp):
-        secs = header_stamp["sec"]
-        nanosecs = header_stamp["nanosec"]
-        return secs + nanosecs * 10 ** -9
+    def timestamp_to_secs(self, header_stamp: float):
+        """!
+        Convert a header timestamp to a float value including nanoseconds.
+        @param header_stamp "float" header with fields using for converting the
+            timestamp to seconds.
+        @return "float" value with the header timestamp.
+        """
+        return header_stamp["sec"] + header_stamp["nanosec"] * 10 ** -9
 
     def get_topic_stats(self):
+        """!
+        Calculate and return the topic stats.
+        @return "list" includes three (3) values: the rate in which the latest
+            messages were received; the latency if the message includes a header, and
+            a boolean indicating if the message has header.
+        """
+        t_average = self.calculate_average(self.rate_list)
+        self.rate = 1.0 / t_average if t_average != 0.0 else 0.0
+        self.latency = self.calculate_average(self.latency_list) if self.has_header else 0.0
         return [self.rate, self.latency, self.has_header]
 
 
