@@ -34,8 +34,13 @@ class TopicHandler:
     C_ALPHA = 1 - ALPHA
 
     def __init__(self, topic_name, client, node: Node):
-        """! Class to handle the node behavior.
-        @param topic_name "str" 
+        """! Class to handle the node behavior. 
+        This class provides statistics measurements for topics such as the
+        current latency and publish rate.
+
+        @param topic_name "str" name of the topic being handled.
+        @param client "RosboardClient" client for the topic.
+        @param node "Node" ROS node instance to communicate with ROS.
         """
 
         self.client = client
@@ -65,10 +70,14 @@ class TopicHandler:
         self.running = True
 
         # Create timers to run auxiliary functions
-        th_state = Thread(target=self.define_node_state, daemon=True)
-        th_state.start()
+        self.th_state = Thread(target=self.define_node_state, daemon=True)
+        self.th_state.start()
+
+    def __del__(self):
+        self.running = False
 
     def close_connection(self):
+        """! Close the connection to the topic."""
         rclpy.logging.get_logger("rosboard_desktop_client").info(f"Closing connection for {self.topic_name}")
         self.client.destroy_socket_subscription(self.topic_name)
         self.running = False
@@ -153,14 +162,10 @@ class RosboardClientGui(QMainWindow):
     def __init__(self):
         super(QMainWindow, self).__init__()
 
-        # Relevant variables
+        # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
-        self.client = None
-        self.server_ip_addr = None
-        self.is_connected = False
-        self.retry_connection = False
-        self.topic_handlers = {}
-        self.available_topics = []
+
+        self.reset_network_attributes()
 
         # Main window configurations
         self.setWindowTitle("Rosboard Client GUI")
@@ -226,6 +231,21 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer = QTimer(self)
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
 
+    def closeEvent(self, event):
+        """! Function for handling the close interface  """
+        RosboardClient.stop_reactor()
+        if self.is_connected:
+            self.disconnect_from_server()
+        super(QMainWindow, self).closeEvent(event)
+
+    def reset_network_attributes(self):
+        """! Function that resets the network-related attributes of the class."""
+        self.client = None
+        self.server_ip_addr = None
+        self.is_connected = False
+        self.retry_connection = False
+        self.topic_handlers = {}
+        self.available_topics = []
 
     def show_warning_message(self, title, message):
         """! Function to generate a warning in the interface.
@@ -346,41 +366,67 @@ class RosboardClientGui(QMainWindow):
             return False
 
     def connect_to_server(self):
+        """! Function to connect to rosboard server.
+
+        This function will attempt to connect to the rosboard server. In order
+        to do so, it will first test the connection based on the parameters
+        that were input in the connection address field. Then, it will create
+        a RosboardClient instance and configure the interface according to the
+        current available topics.
+        """
+        # Test the connection before connecting.
         if self.test_connection():
+
+            # Get the connection parameters from the connection widget.
             ip_addr, port = self.connection_widget.get_connection_address()
 
-            # Connect to client
+            # Connect to the rosboard client
             self.client = RosboardClient(
                 host=f"{ip_addr}:{port}", 
                 connection_timeout=5.0
             )
 
-            # Get topics list and add them to interface
+            # Get topics list and add them to the topics list widget.
             self.topic_handlers = {}
             self.available_topics = self.client.get_available_topics()
             for topic in self.available_topics:
                 self.topics_list_widget.add_topic_at_end(topic)
 
-            # Start the timer to update topics
-            self.server_ip_addr = ip_addr
-            self.is_connected = True
+            # Start the timers to update topics list and stats.
             self.topic_stats_timer.start(250)
             self.topic_upd_timer.start(5000)
+
+            # Store the connection address and set flag
+            self.server_ip_addr = ip_addr
+            self.is_connected = True
+
+            # Configure the connection widget to connected status
             self.connection_widget.set_buttons_status(self.is_connected)
             self.connection_widget.toggle_edits(False)
 
     def disconnect_from_server(self):
-        self.available_topics = []
+        """! Disconnects the interface from the rosboard server.
+
+        This function will destroy the socket connections to topics in the
+        server, destroy the connection and restore the interface to its 
+        disconnected status.
+        """
+        # Stop timers to update topics list and stats.
         self.topic_upd_timer.stop()
         self.topic_stats_timer.stop()
-        self.client = None
-        for topic in self.topic_handlers.keys():
+
+        # Destroy the socket connections for each topic
+        for topic in list(self.topic_handlers.keys()):
             self.topic_handlers[topic].close_connection()
             del self.topic_handlers[topic]
+
+        # Reset the interface network attributes
+        self.reset_network_attributes()
+
+        # Restore the interface to the disconnected status
         self.topics_list_widget.remove_all_topics()
         self.topics_panel_widget.remove_all_topics()
         self.connection_widget.toggle_edits(True)
-        self.is_connected = False
         self.connection_widget.set_buttons_status(self.is_connected)
 
     def add_topic_to_panel(self, topic_name):
