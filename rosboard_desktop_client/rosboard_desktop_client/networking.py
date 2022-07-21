@@ -15,6 +15,7 @@ import threading
 import logging
 
 from twisted.internet import reactor
+from twisted.internet.error import ReactorNotRunning
 from twisted.internet.error import ReactorAlreadyRunning
 from twisted.internet.protocol import ReconnectingClientFactory
 
@@ -275,10 +276,18 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self.logger.info("available topics advertised by server")
 
     def run_reactor(self):
-        """! Function to start the reactor. Handles if the reactor is already running. """
+        """! Function to start the reactor. Handles if the reactor is already running."""
         try:
             reactor.run(False)
         except ReactorAlreadyRunning as e:
+            pass
+
+    @staticmethod
+    def stop_reactor():
+        """! Function to stop the reactor. Handles the error if the reactor is not running. """
+        try:
+            reactor.stop()
+        except ReactorNotRunning as e:
             pass
 
     def create_socket_subscription(self, msg_type: str, topic: str, callback) -> None:
