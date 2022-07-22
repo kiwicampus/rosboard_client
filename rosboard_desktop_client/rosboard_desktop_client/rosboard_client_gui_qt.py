@@ -10,6 +10,7 @@ Code Information:
 
 # =============================================================================
 import sys
+from typing import Tuple
 
 import rclpy
 from rclpy.node import Node
@@ -159,6 +160,9 @@ class TopicHandler:
 
 class RosboardClientGui(QMainWindow):
 
+    # List to store the valid protocols
+    valid_protocols = ["ws", "wss", "http", "https" "tcp"]
+
     def __init__(self):
         super(QMainWindow, self).__init__()
 
@@ -260,7 +264,8 @@ class RosboardClientGui(QMainWindow):
         msg.exec_()
 
     def check_connection_status(self):
-        """! Check the connection status of the client.
+        """!
+        Check the connection status of the client.
         """
         if self.client is not None:
             self.is_connected = self.client.protocol.is_connected
@@ -344,15 +349,43 @@ class RosboardClientGui(QMainWindow):
                     self.available_topics.append(topic)
                     self.add_topic_to_list(topic)
 
-    def test_connection(self):
+    def process_connection_address(self, address: str):
+        """! Process the input address to define a server host/port pair.
+        @param address "str"  
+        @return "bool"
+        @return "str" 
+        @return "int" 
+        """
+        parameters = address.split(':')
+        if len(parameters) == 3:
+            if parameters[0] in RosboardClientGui.valid_protocols:
+                try:
+                    return True, parameters[1].strip("//"), int(parameters[2])
+                except ValueError as e:
+                    return False, "", 0
+            else:
+                return False, "", 0
+
+        elif len(parameters) == 2:
+            if parameters[0] in RosboardClientGui.valid_protocols:
+                return True, parameters[1].strip("//"), 80
+            else:
+                try:
+                    return True, parameters[0].strip("//"), int(parameters[1])
+                except ValueError as ve:
+                    return False, "", 0
+
+        if len(parameters) == 1:
+            return True, parameters[0], 80
+
+    def test_connection(self, host: str, port: int) -> bool:
         """!
         Check the websocket status and enable the connect button.
         """
         try:
-            ip_addr, port = self.connection_widget.get_connection_address()
             test_socket = socket(AF_INET, SOCK_STREAM)
             test_socket.settimeout(1.0)
-            is_avail = test_socket.connect_ex((ip_addr, int(port))) == 0
+            is_avail = test_socket.connect_ex((host, int(port))) == 0
             test_socket.close()
             if not is_avail:
                 self.show_warning_message(
@@ -382,15 +415,18 @@ class RosboardClientGui(QMainWindow):
         a RosboardClient instance and configure the interface according to the
         current available topics.
         """
-        # Test the connection before connecting.
-        if self.test_connection():
+        # Get the connection parameters from the connection widget.
+        address = self.connection_widget.get_connection_address()
+        valid, host, port = self.process_connection_address(address)
 
-            # Get the connection parameters from the connection widget.
-            ip_addr, port = self.connection_widget.get_connection_address()
+        print(f"For {address} result is {valid}: {host}:{port}")
+
+        # Test the connection before connecting.
+        if valid and self.test_connection(host, port):
 
             # Connect to the rosboard client
             self.client = RosboardClient(
-                host=f"{ip_addr}:{port}", 
+                host=f"{host}:{port}", 
                 connection_timeout=5.0
             )
 
@@ -405,7 +441,7 @@ class RosboardClientGui(QMainWindow):
             self.topic_upd_timer.start(5000)
 
             # Store the connection address and set flag
-            self.server_ip_addr = ip_addr
+            self.server_ip_addr = host
             self.is_connected = True
 
             # Configure the connection widget to connected status
@@ -500,12 +536,7 @@ class ConnectionWidget(QWidget):
         self.setLayout(ly_widget)
 
     def get_connection_address(self):
-        address = self.address_le.text().split("//")[-1]
-        address = address.split(':')
-        if len(address) == 2:
-            return address[0], address[1]
-        else:
-            return "", ""
+        return self.address_le.text()
 
     def set_buttons_status(self, is_connected: bool):
         """!
