@@ -318,16 +318,24 @@ class RosboardClientGui(QMainWindow):
         )
 
     def update_available_topics(self):
-        """!
-        Updates the available topics in the list.
+        """! Updates the available topics in the interface.
+
+        This function checks for the currently available topics from the
+        server. 
+
         """
+        # Check if the client is connected to the server
         if self.client.protocol.is_connected:
+
+            # Get the currently available topics
             current_topics = self.client.get_available_topics()
 
-            # Remove topics from interface
+            # Remove topics from topic list
+            list_topics = self.topics_list_widget.get_current_topics()
             for topic in self.available_topics:
                 if topic not in current_topics:
-                    self.topics_list_widget.remove_topic(topic)
+                    if topic in list_topics:
+                        self.topics_list_widget.remove_topic(topic)
                     self.available_topics.remove(topic)
 
             # Add new topics to interface
@@ -335,8 +343,6 @@ class RosboardClientGui(QMainWindow):
                 if topic not in self.available_topics:
                     self.available_topics.append(topic)
                     self.add_topic_to_list(topic)
-        else:
-            pass
 
     def test_connection(self):
         """!
@@ -622,6 +628,12 @@ class TopicsListWidget(QWidget):
         for tn in topic_names:
             self.remove_topic(tn)
 
+    def get_current_topics(self):
+        """!
+        Return the current topics in widget.
+        """
+        return [btn.text() for btn in self.topic_btns]
+
 
 class TopicsPanelWidget(QWidget):
     """!
@@ -684,6 +696,12 @@ class TopicsPanelWidget(QWidget):
         for widget in self.widgets_list:
             self.ly_widget.addWidget(widget, count // 4, count % 4)
             count += 1
+
+    def get_current_topics(self):
+        """!
+        Return the current topics in widget.
+        """
+        return [topic_wg.topic_name for topic_wg in self.widgets_list]
 
 
 class TopicWidget(QWidget):
