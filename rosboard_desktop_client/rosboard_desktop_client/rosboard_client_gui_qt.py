@@ -274,6 +274,9 @@ class RosboardClientGui(QMainWindow):
             if self.retry_connection and self.is_connected:
                 self.restore_interface()
                 self.retry_connection = False
+                self.connection_widget.set_status_label(True)
+            elif self.retry_connection and not self.is_connected:
+                self.connection_widget.set_status_label(True, True)
             else:
                 self.retry_connection = not self.is_connected
         else:
@@ -455,6 +458,7 @@ class RosboardClientGui(QMainWindow):
             # Configure the connection widget to connected status
             self.connection_widget.set_buttons_status(self.is_connected)
             self.connection_widget.toggle_edits(False)
+            self.connection_widget.set_status_label(connected=True)
 
     def disconnect_from_server(self):
         """! Disconnects the interface from the rosboard server.
@@ -481,6 +485,7 @@ class RosboardClientGui(QMainWindow):
         self.topics_panel_widget.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.connection_widget.set_buttons_status(self.is_connected)
+        self.connection_widget.set_status_label(connected=False)
 
     def add_topic_to_panel(self, topic_name):
         try:
@@ -517,11 +522,10 @@ class ConnectionWidget(QWidget):
     """
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
+        self.setObjectName("ConnectionWidget")
 
         # Create the line edits for the IP Address and the port
         self.address_le = QLineEdit()
-
-        # Define a default address
         self.address_le.setText("localhost:8888")
 
         # Create the buttons for connecting and disconnecting the buttons
@@ -529,19 +533,23 @@ class ConnectionWidget(QWidget):
         self.connect_bt.setEnabled(True)
         self.disconnect_bt = QPushButton("DISCONNECT")
         self.disconnect_bt.setEnabled(False)
-
-        # Connect to slots in parent
         self.connect_bt.clicked.connect(self.parent().connect_to_server)
         self.disconnect_bt.clicked.connect(self.parent().disconnect_from_server)
+
+        # Label to provide feedback on connection status
+        self.status_lb = QLabel("DISCONNECTED")
+        self.status_lb.setObjectName("StatusLabel")
+        self.setStyleSheet("QLabel#StatusLabel{background: red;}")
 
         # Define the widget layout
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
         ly_widget.setContentsMargins(0, 0, 0, 0)        
         ly_widget.addWidget(QLabel("ADDRESS:"), 0, 0, Qt.AlignRight)
+        ly_widget.addWidget(self.status_lb, 1, 0, Qt.AlignRight)
         ly_widget.addWidget(self.address_le, 0, 1, 1, 2)
-        ly_widget.addWidget(self.connect_bt, 2, 1)
-        ly_widget.addWidget(self.disconnect_bt, 2, 2)
+        ly_widget.addWidget(self.connect_bt, 1, 1)
+        ly_widget.addWidget(self.disconnect_bt, 1, 2)
         self.setLayout(ly_widget)
 
     def get_connection_address(self):
@@ -561,6 +569,21 @@ class ConnectionWidget(QWidget):
         @param enabled "bool" indicates if the line edits are enabled or not.
         """
         self.address_le.setEnabled(enabled)
+
+    def set_status_label(self, connected: bool, retry: bool = False):
+        """! Set the status label to a given value. """
+        if connected:
+            if retry:
+                self.status_lb.setText("RETRYING")
+                self.setStyleSheet("QLabel#StatusLabel{background: yellow;}")
+
+            else:
+                self.status_lb.setText("CONNECTED")
+                self.setStyleSheet("QLabel#StatusLabel{background: green;}")
+
+        else:
+            self.status_lb.setText("DISCONNECTED")
+            self.setStyleSheet("QLabel#StatusLabel{background: red;}")
 
 
 class StatsWidget(QWidget):
