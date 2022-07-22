@@ -10,7 +10,6 @@ Code Information:
 
 # =============================================================================
 import sys
-from typing import Tuple
 
 import rclpy
 from rclpy.node import Node
@@ -23,7 +22,7 @@ from socket import socket, AF_INET, SOCK_STREAM, gaierror
 
 from functools import partial
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox, QMessageBox
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox, QMessageBox, QSplitter
 
 from rosboard_desktop_client.networking import RosboardClient
 from rosboard_desktop_client.republishers import PublisherManager
@@ -187,14 +186,15 @@ class RosboardClientGui(QMainWindow):
         ly_top.addWidget(self.stats_widget, 3)
 
         # Define the bottom layout (topics list + topic stats)
-        ly_bottom = QHBoxLayout()
-        ly_bottom.addWidget(self.topics_list_widget)
-        ly_bottom.addWidget(self.topics_panel_widget)
+        splitter_bottom = QSplitter(self)
+        splitter_bottom.splitterMoved.connect(self.configure_topics_panel)
+        splitter_bottom.addWidget(self.topics_list_widget)
+        splitter_bottom.addWidget(self.topics_panel_widget)
 
         # Define the main layout for window
         ly_main = QVBoxLayout()
-        ly_main.addLayout(ly_top)
-        ly_main.addLayout(ly_bottom)
+        ly_main.addLayout(ly_top, stretch=1)
+        ly_main.addWidget(splitter_bottom, stretch=10)
         
         # Define the central widget and set the layout
         wg_main = QWidget(self)
@@ -245,21 +245,26 @@ class RosboardClientGui(QMainWindow):
 
     def resizeEvent(self, event):
         """ Update the user interface on resize. """
-        print(self.size())
-        ui_width = self.size().width()
-        if ui_width < 1001:
+        self.configure_topics_panel()
+        super().resizeEvent(event)
+
+    def configure_topics_panel(self):
+        ui_width = self.topics_panel_widget.size().width()
+        if ui_width < 501:
             self.topics_panel_widget.MAX_COLS = 1
             self.topics_panel_widget.configure_panel()
-        if ui_width > 1000 and ui_width < 1400:
+        if ui_width > 500 and ui_width < 701:
             self.topics_panel_widget.MAX_COLS = 2
             self.topics_panel_widget.configure_panel()
-        if ui_width > 1401 and ui_width < 1800:
+        if ui_width > 700 and ui_width < 901:
             self.topics_panel_widget.MAX_COLS = 3
             self.topics_panel_widget.configure_panel()
-        if ui_width > 1800:
+        if ui_width > 900 and ui_width < 1101:
             self.topics_panel_widget.MAX_COLS = 4
             self.topics_panel_widget.configure_panel()
-        super().resizeEvent(event)
+        if ui_width > 1100 and ui_width < 1301:
+            self.topics_panel_widget.MAX_COLS = 5
+            self.topics_panel_widget.configure_panel()
 
     def reset_network_attributes(self):
         """! Reset the network-related attributes of the class."""
@@ -688,7 +693,7 @@ class TopicsListWidget(QWidget):
 
         # Insert the button into widget
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic_name))
+        bt_topic.clicked.connect(partial(self.parent().parent().parent().add_topic_to_panel, topic_name))
         self.topic_btns.insert(topic_indx + 1, bt_topic)
         self.ly_topics.insertWidget(topic_indx, bt_topic)
 
@@ -698,7 +703,7 @@ class TopicsListWidget(QWidget):
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic_name))
+        bt_topic.clicked.connect(partial(self.parent().parent().parent().add_topic_to_panel, topic_name))
         self.topic_btns.append(bt_topic)
         self.ly_topics.addWidget(self.topic_btns[-1])
 
@@ -819,7 +824,7 @@ class TopicWidget(QWidget):
         
         bt_close = QPushButton("X")
         bt_close.clicked.connect(partial(
-            self.parent().parent().parent().add_topic_to_list,
+            self.parent().parent().parent().parent().add_topic_to_list,
             self.topic_name
         ))
 
