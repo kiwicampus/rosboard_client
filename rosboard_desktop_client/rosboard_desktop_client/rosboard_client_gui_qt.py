@@ -15,7 +15,7 @@ from typing import Tuple
 import rclpy
 from rclpy.node import Node
 
-from icmplib import ping
+from icmplib import ping, NameLookupError
 from time import time, sleep
 from threading import Thread
 from psutil import cpu_percent, net_io_counters
@@ -243,7 +243,7 @@ class RosboardClientGui(QMainWindow):
         super(QMainWindow, self).closeEvent(event)
 
     def reset_network_attributes(self):
-        """! Function that resets the network-related attributes of the class."""
+        """! Reset the network-related attributes of the class."""
         self.client = None
         self.server_ip_addr = None
         self.is_connected = False
@@ -252,7 +252,7 @@ class RosboardClientGui(QMainWindow):
         self.available_topics = []
 
     def show_warning_message(self, title, message):
-        """! Function to generate a warning in the interface.
+        """! Show a warning message box in the interface.
         @param title "str" title for the warning.
         @param message "str" content for the warning.
         """
@@ -310,8 +310,13 @@ class RosboardClientGui(QMainWindow):
     def update_roundtrip(self):
         if self.client is not None:
             if self.client.protocol.is_connected:
-                ping_response = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
-                self.roundtrip = ping_response.avg_rtt
+                try:
+                    ping_response = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
+                    self.roundtrip = ping_response.avg_rtt
+                except gaierror as ge:
+                    pass
+                except NameLookupError as nle:
+                    pass
         else:
             self.roundtrip = 0.0
 
