@@ -75,6 +75,7 @@ class TopicHandler:
         self.th_state.start()
 
     def __del__(self):
+        """! Class destructor. Used to stop threads from continuous execution. """
         self.running = False
 
     def close_connection(self):
@@ -115,7 +116,6 @@ class TopicHandler:
 
         This function processes the incoming messages in order to provide the
         stats of the 
-
         """
         self.n_msgs += 1
         t_current_msg = time()
@@ -165,6 +165,7 @@ class RosboardClientGui(QMainWindow):
 
     def __init__(self):
         super(QMainWindow, self).__init__()
+        self.setMinimumSize(600, 400)
 
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
@@ -242,6 +243,24 @@ class RosboardClientGui(QMainWindow):
                 self.disconnect_from_server()
         super(QMainWindow, self).closeEvent(event)
 
+    def resizeEvent(self, event):
+        """ Update the user interface on resize. """
+        print(self.size())
+        ui_width = self.size().width()
+        if ui_width < 1001:
+            self.topics_panel_widget.MAX_COLS = 1
+            self.topics_panel_widget.configure_panel()
+        if ui_width > 1000 and ui_width < 1400:
+            self.topics_panel_widget.MAX_COLS = 2
+            self.topics_panel_widget.configure_panel()
+        if ui_width > 1401 and ui_width < 1800:
+            self.topics_panel_widget.MAX_COLS = 3
+            self.topics_panel_widget.configure_panel()
+        if ui_width > 1800:
+            self.topics_panel_widget.MAX_COLS = 4
+            self.topics_panel_widget.configure_panel()
+        super().resizeEvent(event)
+
     def reset_network_attributes(self):
         """! Reset the network-related attributes of the class."""
         self.client = None
@@ -305,9 +324,11 @@ class RosboardClientGui(QMainWindow):
             self.add_topic_to_panel(topic)
 
     def update_cpu_usage(self):
+        """! Update the CPU usage statistic value. """
         self.cpu_usage = cpu_percent()
 
     def update_roundtrip(self):
+        """! Update the roundtrip response time value. """
         if self.client is not None:
             if self.client.protocol.is_connected:
                 try:
@@ -321,12 +342,14 @@ class RosboardClientGui(QMainWindow):
             self.roundtrip = 0.0
 
     def update_download_speed(self):
+        """! Update the download speed statistic value. """
         net_if_stats_val = net_io_counters()
         received_bytes = net_if_stats_val.bytes_recv - self.old_bytes_recv
         self.old_bytes_recv = net_if_stats_val.bytes_recv
         self.download_speed = (received_bytes / 1024.0) / 0.25
 
     def update_stats(self):
+        """! Update the statistics value in the user interface. """
         self.stats_widget.update_stats_widget(
             self.cpu_usage,
             self.roundtrip,
@@ -709,6 +732,9 @@ class TopicsPanelWidget(QWidget):
     """
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
+
+        # Define attributes for max. columns
+        self.MAX_COLS = 4
         
         # Define the layout for the widget
         self.ly_widget = QGridLayout()
@@ -762,7 +788,7 @@ class TopicsPanelWidget(QWidget):
     def configure_panel(self):
         count = 0
         for widget in self.widgets_list:
-            self.ly_widget.addWidget(widget, count // 4, count % 4)
+            self.ly_widget.addWidget(widget, count // self.MAX_COLS, count % self.MAX_COLS)
             count += 1
 
     def get_current_topics(self):
