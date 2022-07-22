@@ -206,7 +206,7 @@ class RosboardClientGui(QMainWindow):
         self.download_speed = 0.0
         self.old_bytes_recv = 0.0
 
-        # Create timers to update each of the stats
+        # Create timers to update each of the interface stats
         cpu_usage_timer = QTimer(self)
         roundtrip_timer = QTimer(self)
         download_speed_timer = QTimer(self)
@@ -227,9 +227,8 @@ class RosboardClientGui(QMainWindow):
         self.topic_stats_timer.timeout.connect(self.update_topic_stats_and_state)
 
         # Timer that checks the connection status to handle closures
-        networking_timer = QTimer(self)
-        networking_timer.timeout.connect(self.check_connection_status)
-        networking_timer.start(500)
+        self.restore_timer = QTimer(self)
+        self.restore_timer.timeout.connect(self.restore_interface_on_reconnection)
 
         # Timer to update the available topics
         self.topic_upd_timer = QTimer(self)
@@ -263,9 +262,12 @@ class RosboardClientGui(QMainWindow):
         msg.setWindowTitle(title)
         msg.exec_()
 
-    def check_connection_status(self):
-        """!
-        Check the connection status of the client.
+    def restore_interface_on_reconnection(self):
+        """! Check the connection status and restore the interface.
+
+        This function test the connection status of the client and
+        calls the 'restore_interface' function to restore the
+        interface if a reconnection is found to take place.
         """
         if self.client is not None:
             self.is_connected = self.client.protocol.is_connected
@@ -274,23 +276,24 @@ class RosboardClientGui(QMainWindow):
                 self.retry_connection = False
             else:
                 self.retry_connection = not self.is_connected
+        else:
+            self.is_connected = False
 
     def restore_interface(self):
-        """!
-        Restore the interface to the current state after a reconnection.
-        """
+        """! Restore the interface after a reconnection. """
         self.node.get_logger().info("Restoring interface after reconnection.")
         # Get current topics to restore them later.
-        current_topics = []
-        for tw in self.topics_panel_widget.widgets_list:
-            current_topics.append(tw.topic_name)
-        # Delete the topic handlers # TODO: convert this into a function. SRP.
+        current_topics = self.topics_panel_widget.get_current_topics()
+
+        # Delete the topic handlers.
         for topic in list(self.topic_handlers.keys()):
             self.topic_handlers[topic].close_connection()
             del self.topic_handlers[topic]
+        
         # Clean the interface
         self.topics_list_widget.remove_all_topics()
         self.topics_panel_widget.remove_all_topics()
+        
         # Configure the interface
         available_topics = self.client.get_available_topics()
         for topic in available_topics:
@@ -326,8 +329,12 @@ class RosboardClientGui(QMainWindow):
         """! Updates the available topics in the interface.
 
         This function checks for the currently available topics from the
-        server. 
-
+        server. If a topic is not in the interface but in the available
+        topics, it is added to the topic list.
+        
+        If a topic is in the interface but not in the available topics, it is
+        removed only if it is in the topic list. If topic is in the topics 
+        panel, it will not be removed.
         """
         # Check if the client is connected to the server
         if self.client.protocol.is_connected:
@@ -351,10 +358,12 @@ class RosboardClientGui(QMainWindow):
 
     def process_connection_address(self, address: str):
         """! Process the input address to define a server host/port pair.
-        @param address "str"  
-        @return "bool"
-        @return "str" 
-        @return "int" 
+
+        @param address "str" input address that will be processed.
+
+        @return "bool" indicates if processing was successful or not.
+        @return "str" host address for connection.
+        @return "int" port for connection.
         """
         parameters = address.split(':')
         if len(parameters) == 3:
@@ -419,8 +428,6 @@ class RosboardClientGui(QMainWindow):
         address = self.connection_widget.get_connection_address()
         valid, host, port = self.process_connection_address(address)
 
-        print(f"For {address} result is {valid}: {host}:{port}")
-
         # Test the connection before connecting.
         if valid and self.test_connection(host, port):
 
@@ -436,9 +443,10 @@ class RosboardClientGui(QMainWindow):
             for topic in self.available_topics:
                 self.topics_list_widget.add_topic_at_end(topic)
 
-            # Start the timers to update topics list and stats.
+            # Start the timers to update topics list, stats and restore interface
             self.topic_stats_timer.start(250)
             self.topic_upd_timer.start(5000)
+            self.restore_timer.start(500)
 
             # Store the connection address and set flag
             self.server_ip_addr = host
@@ -455,9 +463,10 @@ class RosboardClientGui(QMainWindow):
         server, destroy the connection and restore the interface to its 
         disconnected status.
         """
-        # Stop timers to update topics list and stats.
+        # Stop timers to update topics list, stats and interface restore.
         self.topic_upd_timer.stop()
         self.topic_stats_timer.stop()
+        self.restore_timer.stop()
 
         # Destroy the socket connections for each topic
         for topic in list(self.topic_handlers.keys()):
