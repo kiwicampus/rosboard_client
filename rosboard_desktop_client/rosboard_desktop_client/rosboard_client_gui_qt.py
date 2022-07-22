@@ -164,7 +164,7 @@ class RosboardClientGui(QMainWindow):
 
     def __init__(self):
         super(QMainWindow, self).__init__()
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(650, 400)
 
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
@@ -299,7 +299,7 @@ class RosboardClientGui(QMainWindow):
                 self.restore_interface()
                 self.retry_connection = False
                 self.connection_widget.set_status_label(True)
-            elif self.retry_connection and not self.is_connected:
+            if self.retry_connection and not self.is_connected:
                 self.connection_widget.set_status_label(True, True)
             else:
                 self.retry_connection = not self.is_connected
@@ -578,11 +578,12 @@ class ConnectionWidget(QWidget):
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
         ly_widget.setContentsMargins(0, 0, 0, 0)        
-        ly_widget.addWidget(QLabel("ADDRESS:"), 0, 0, Qt.AlignRight)
-        ly_widget.addWidget(self.status_lb, 1, 0, Qt.AlignRight)
-        ly_widget.addWidget(self.address_le, 0, 1, 1, 2)
-        ly_widget.addWidget(self.connect_bt, 1, 1)
-        ly_widget.addWidget(self.disconnect_bt, 1, 2)
+        ly_widget.addWidget(QLabel("ADDRESS:"), 0, 0, 1, 2, Qt.AlignCenter)
+        ly_widget.addWidget(self.address_le, 1, 0, 1, 2)
+        ly_widget.addWidget(self.connect_bt, 2, 0)
+        ly_widget.addWidget(self.disconnect_bt, 2, 1)
+        ly_widget.addWidget(self.status_lb, 3, 0, 1, 2, Qt.AlignCenter)
+        
         self.setLayout(ly_widget)
 
     def get_connection_address(self):
@@ -660,6 +661,7 @@ class TopicsListWidget(QWidget):
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsListWidget")
+        self.setMinimumWidth(300)
 
         self.topic_btns = []
 
@@ -737,6 +739,7 @@ class TopicsPanelWidget(QWidget):
     """
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
+        self.setMinimumWidth(300)
 
         # Define attributes for max. columns
         self.MAX_COLS = 4
