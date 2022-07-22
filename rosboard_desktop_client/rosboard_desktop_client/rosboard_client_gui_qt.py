@@ -232,10 +232,11 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
 
     def closeEvent(self, event):
-        """! Function for handling the close interface  """
+        """! Function for handling the close interface. """
         RosboardClient.stop_reactor()
-        if self.is_connected:
-            self.disconnect_from_server()
+        if self.client is not None:
+            if self.client.protocol.is_connected:
+                self.disconnect_from_server()
         super(QMainWindow, self).closeEvent(event)
 
     def reset_network_attributes(self):
@@ -279,7 +280,7 @@ class RosboardClientGui(QMainWindow):
         for tw in self.topics_panel_widget.widgets_list:
             current_topics.append(tw.topic_name)
         # Delete the topic handlers # TODO: convert this into a function. SRP.
-        for topic in self.topic_handlers.keys():
+        for topic in list(self.topic_handlers.keys()):
             self.topic_handlers[topic].close_connection()
             del self.topic_handlers[topic]
         # Clean the interface
@@ -296,9 +297,10 @@ class RosboardClientGui(QMainWindow):
         self.cpu_usage = cpu_percent()
 
     def update_roundtrip(self):
-        if self.is_connected:
-            ping_response = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
-            self.roundtrip = ping_response.avg_rtt
+        if self.client is not None:
+            if self.client.protocol.is_connected:
+                ping_response = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
+                self.roundtrip = ping_response.avg_rtt
         else:
             self.roundtrip = 0.0
 
@@ -319,7 +321,7 @@ class RosboardClientGui(QMainWindow):
         """!
         Updates the available topics in the list.
         """
-        if self.is_connected:
+        if self.client.protocol.is_connected:
             current_topics = self.client.get_available_topics()
 
             # Remove topics from interface
@@ -581,15 +583,17 @@ class TopicsListWidget(QWidget):
         Add a button to the topic list in the panel in alphabetic order.
         @param topic_name "str" name of the topic that will be linked to the button. 
         """
+        # Add topic to list and get index
         current_topics = [bt.text() for bt in self.topic_btns]
-        self.remove_all_topics()
         current_topics.append(topic_name)
         current_topics = sorted(current_topics)
-        for topic in current_topics:
-            bt_topic = QPushButton(topic)
-            bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic))
-            self.topic_btns.append(bt_topic)
-            self.ly_topics.addWidget(self.topic_btns[-1])
+        topic_indx = current_topics.index(topic_name)
+
+        # Insert the button into widget
+        bt_topic = QPushButton(topic_name)
+        bt_topic.clicked.connect(partial(self.parent().parent().add_topic_to_panel, topic_name))
+        self.topic_btns.insert(topic_indx + 1, bt_topic)
+        self.ly_topics.insertWidget(topic_indx, bt_topic)
 
     def add_topic_at_end(self, topic_name):
         """!
