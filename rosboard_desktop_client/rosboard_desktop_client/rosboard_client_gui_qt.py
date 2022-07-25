@@ -9,10 +9,12 @@ Code Information:
 """
 
 # =============================================================================
+import os
 import sys
 
 import rclpy
 from rclpy.node import Node
+from ament_index_python import get_package_prefix
 
 from icmplib import ping, NameLookupError
 from time import time, sleep
@@ -160,11 +162,19 @@ class TopicHandler:
 class RosboardClientGui(QMainWindow):
 
     # List to store the valid protocols
-    valid_protocols = ["ws", "wss", "http", "https" "tcp"]
+    valid_protocols = ["ws", "wss", "http", "https", "tcp"]
 
     def __init__(self):
         super(QMainWindow, self).__init__()
         self.setMinimumSize(650, 400)
+
+        # Load stylesheet
+        base_path = get_package_prefix("rosboard_desktop_client")
+        base_path = base_path.replace("install", "src") # It is dirty, I know
+        file_path = "rosboard_desktop_client/rosboard_desktop_client/resources/rosboard.qss"
+        full_path = os.path.join(base_path, file_path)
+        with open(full_path, 'r') as ss_file:
+            self.setStyleSheet(ss_file.read())
 
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
@@ -605,16 +615,20 @@ class ConnectionWidget(QWidget):
         self.address_le.setEnabled(enabled)
 
     def set_status_label(self, connected: bool, retry: bool = False):
-        """! Set the status label to a given value. """
+        """! Set the status label display based on parameters.
+        
+        @param connected "bool" indicate if the interface is connected to the
+        server or not.
+        @param retry "bool" indicate if the interface is retrying to establish
+        a connection.
+         """
         if connected:
             if retry:
                 self.status_lb.setText("RETRYING")
                 self.setStyleSheet("QLabel#StatusLabel{background: yellow;}")
-
             else:
                 self.status_lb.setText("CONNECTED")
                 self.setStyleSheet("QLabel#StatusLabel{background: green;}")
-
         else:
             self.status_lb.setText("DISCONNECTED")
             self.setStyleSheet("QLabel#StatusLabel{background: red;}")
@@ -700,8 +714,7 @@ class TopicsListWidget(QWidget):
         self.ly_topics.insertWidget(topic_indx, bt_topic)
 
     def add_topic_at_end(self, topic_name):
-        """!
-        add a button ot the topic list in the panel at its end.
+        """! Add a button to the at the end of the topic list.
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         bt_topic = QPushButton(topic_name)
@@ -710,8 +723,8 @@ class TopicsListWidget(QWidget):
         self.ly_topics.addWidget(self.topic_btns[-1])
 
     def remove_topic(self, topic_name):
-        """!
-        Remove a topic button from the list.
+        """! Remove a topic button from the list.
+        @param topic_name "str" name of the topic whose button will be removed.
         """
         for button in self.topic_btns:
             if button.text() == topic_name:
@@ -719,9 +732,7 @@ class TopicsListWidget(QWidget):
                 button.deleteLater()
 
     def remove_all_topics(self):
-        """!
-        Remove all topics from widget.
-        """
+        """! Remove all topics from widget. """
         topic_names = [btn.text() for btn in self.topic_btns]
         for tn in topic_names:
             self.remove_topic(tn)
@@ -739,6 +750,7 @@ class TopicsPanelWidget(QWidget):
     """
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
+        self.setObjectName("TopicsPanelWidget")
         self.setMinimumWidth(300)
 
         # Define attributes for max. columns
