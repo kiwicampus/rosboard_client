@@ -625,13 +625,13 @@ class ConnectionWidget(QWidget):
         if connected:
             if retry:
                 self.status_lb.setText("RETRYING")
-                self.setStyleSheet("QLabel#StatusLabel{background: yellow;}")
+                self.setStyleSheet("QLabel#StatusLabel{background-color: #FFE666;}")
             else:
                 self.status_lb.setText("CONNECTED")
-                self.setStyleSheet("QLabel#StatusLabel{background: green;}")
+                self.setStyleSheet("QLabel#StatusLabel{background-color: #77CC66;}")
         else:
             self.status_lb.setText("DISCONNECTED")
-            self.setStyleSheet("QLabel#StatusLabel{background: red;}")
+            self.setStyleSheet("QLabel#StatusLabel{background-color: #FF6666;}")
 
 
 class StatsWidget(QWidget):
@@ -875,11 +875,11 @@ class TopicWidget(QWidget):
         @param state "str" represent the received messages values for topic.
         """
         if state == "DELAY":
-            self.setStyleSheet("QWidget#TopicWidget{border: 2px solid black; background: red;}")
+            self.setStyleSheet("QWidget#TopicWidget{background-color: #FF6666;}")
         elif state == "NORMAL":
-            self.setStyleSheet("QWidget#TopicWidget{border: 2px solid black; background: green;}")
+            self.setStyleSheet("QWidget#TopicWidget{background-color: #77CC66;}")
         else:
-            self.setStyleSheet("QWidget#TopicWidget{border: 2px solid black; background: gray;}")
+            self.setStyleSheet("QWidget#TopicWidget{background-color: #B0B0B0;}")
 
 
 def main():
