@@ -20,15 +20,25 @@ QPushButton {
     border-radius: 0;
     color: #000000;
     background-color: #E66617;
+
+    border-color: #000000;
+    border-width: 3px;
+    border-style: none inset inset none;
 }
 
 QPushButton:disabled {
+    border-width: 0;
+    border-style: none;
     background-color: #E69F73;
 }
 
 /* Widget specific configurations */
 QWidget#ConnectionWidget QLabel {
     padding: 5px 20px;
+}
+
+QLabel#StatusLabel {
+    color: black;
 }
 
 QWidget#TopicsListWidget>QScrollArea,
@@ -39,6 +49,10 @@ QWidget#TopicsPanelWidget>QScrollArea {
 QWidget#TopicsListWidget QPushButton {
     color: #FFFFFF;
     background-color: #1863AD;
+}
+
+QWidget#TopicWidget QLabel {
+    color: #000000;
 }
 
 QWidget#TopicWidget QPushButton {
