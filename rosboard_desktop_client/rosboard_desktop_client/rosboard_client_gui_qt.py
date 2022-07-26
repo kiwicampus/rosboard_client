@@ -290,7 +290,7 @@ class RosboardClientGui(QMainWindow):
         @param title "str" title for the warning.
         @param message "str" content for the warning.
         """
-        msg = QMessageBox()
+        msg = QMessageBox(parent=self)
         msg.setIcon(QMessageBox.Warning)
         msg.setText(message)
         msg.setWindowTitle(title)
@@ -477,31 +477,35 @@ class RosboardClientGui(QMainWindow):
         # Test the connection before connecting.
         if valid and self.test_connection(host, port):
 
-            # Connect to the rosboard client
-            self.client = RosboardClient(
-                host=f"{host}:{port}", 
-                connection_timeout=5.0
-            )
+            try:
+                # Connect to the rosboard client
+                self.client = RosboardClient(
+                    host=f"{host}:{port}", 
+                    connection_timeout=5.0
+                )
 
-            # Get topics list and add them to the topics list widget.
-            self.topic_handlers = {}
-            self.available_topics = self.client.get_available_topics()
-            for topic in self.available_topics:
-                self.topics_list_widget.add_topic_at_end(topic)
+                # Get topics list and add them to the topics list widget.
+                self.topic_handlers = {}
+                self.available_topics = self.client.get_available_topics()
+                for topic in self.available_topics:
+                    self.topics_list_widget.add_topic_at_end(topic)
 
-            # Start the timers to update topics list, stats and restore interface
-            self.topic_stats_timer.start(250)
-            self.topic_upd_timer.start(5000)
-            self.restore_timer.start(500)
+                # Start the timers to update topics list, stats and restore interface
+                self.topic_stats_timer.start(250)
+                self.topic_upd_timer.start(5000)
+                self.restore_timer.start(500)
 
-            # Store the connection address and set flag
-            self.server_ip_addr = host
-            self.is_connected = True
+                # Store the connection address and set flag
+                self.server_ip_addr = host
+                self.is_connected = True
 
-            # Configure the connection widget to connected status
-            self.connection_widget.set_buttons_status(self.is_connected)
-            self.connection_widget.toggle_edits(False)
-            self.connection_widget.set_status_label(connected=True)
+                # Configure the connection widget to connected status
+                self.connection_widget.set_buttons_status(self.is_connected)
+                self.connection_widget.toggle_edits(False)
+                self.connection_widget.set_status_label(connected=True)
+            
+            except Exception as e:
+                self.show_warning_message("Timeout while connecting", "There was a timeout when trying to connect to server.")
 
     def disconnect_from_server(self):
         """! Disconnects the interface from the rosboard server.
