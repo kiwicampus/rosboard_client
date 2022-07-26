@@ -1,0 +1,46 @@
+QMainWindow {
+    background-color: #212121;
+}
+
+QWidget {
+    color: #FFFFFF;
+}
+
+QLineEdit {
+    color: #FFFFFF;
+    border-radius: 0;
+    margin: 0 5px;
+    padding: 5px;
+    background-color: #424242;
+}
+
+QPushButton {
+    padding: 5px 0;
+    margin: 5px;
+    border-radius: 0;
+    color: #000000;
+    background-color: #E66617;
+}
+
+QPushButton:disabled {
+    background-color: #E69F73;
+}
+
+/* Widget specific configurations */
+QWidget#ConnectionWidget QLabel {
+    padding: 5px 20px;
+}
+
+QWidget#TopicsListWidget>QScrollArea,
+QWidget#TopicsPanelWidget>QScrollArea {
+    background-color: #303030;
+}
+
+QWidget#TopicsListWidget QPushButton {
+    color: #FFFFFF;
+    background-color: #1863AD;
+}
+
+QWidget#TopicWidget QPushButton {
+    background-color: #D92B2B;
+}
