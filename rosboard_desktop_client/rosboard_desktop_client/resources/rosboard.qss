@@ -34,22 +34,22 @@ QPushButton:disabled {
 
 QScrollBar:vertical {
     border: none;
-    background: #424242;
+    background: #303030;
 }
 
 QScrollBar::handle:vertical {
     border: 1px solid #212121;
-    background-color: #303030;
+    background-color: #424242;
 }
 
 QScrollBar::add-line:vertical {
-    border: 1px solid #424242;
+    border: 1px solid #212121;
     subcontrol-position: bottom;
     subcontrol-origin: margin;
 }
 
 QScrollBar::sub-line:vertical {
-    border: 1px solid #303030;
+    border: 1px solid #212121;
     subcontrol-position: top;
     subcontrol-origin: margin;
 }
