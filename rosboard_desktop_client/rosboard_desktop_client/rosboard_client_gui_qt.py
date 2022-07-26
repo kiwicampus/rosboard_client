@@ -847,12 +847,12 @@ class TopicWidget(QWidget):
 
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
-        ly_widget.addWidget(lb_name, 1, 0, 1, 2)
-        ly_widget.addWidget(QLabel("Freq. [Hz]:"), 2, 0)
-        ly_widget.addWidget(QLabel("DT [ms]:"), 3, 0)
-        ly_widget.addWidget(self.freq_lb, 2, 1, Qt.AlignRight)
-        ly_widget.addWidget(self.latency_lb, 3, 1, Qt.AlignRight)
-        ly_widget.addWidget(bt_close, 0, 0, 1, 2)
+        ly_widget.addWidget(lb_name, 0, 0, 1, 2)
+        ly_widget.addWidget(QLabel("Freq. [Hz]:"), 1, 0)
+        ly_widget.addWidget(QLabel("DT [ms]:"), 2, 0)
+        ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
+        ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
+        ly_widget.addWidget(bt_close, 3, 0, 1, 2)
         self.setLayout(ly_widget)
 
     def update_topic_stats(self, frequency, latency, has_latency=True):
