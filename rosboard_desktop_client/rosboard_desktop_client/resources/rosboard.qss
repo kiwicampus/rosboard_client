@@ -26,6 +26,11 @@ QPushButton {
     border-style: none inset inset none;
 }
 
+QMessageBox {
+    color: #FFFFFF;
+    background-color: #303030;
+}
+
 QPushButton:disabled {
     border-width: 0;
     border-style: none;
