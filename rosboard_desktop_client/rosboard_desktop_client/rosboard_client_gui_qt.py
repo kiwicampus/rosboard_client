@@ -119,22 +119,21 @@ class TopicHandler:
         stats of the 
         """
         self.n_msgs += 1
-        t_current_msg = time()
-        
+        t_current = time()
         if self.t_last_msg is not None:
             if self.has_header:
                 t_send = self.timestamp_to_secs(msg[1]["header"]["stamp"])
-                self.latency_list.append(t_current_msg - t_send)
-                self.latency_list = self.latency_list[-20:]
+                self.latency_list.append(t_current - t_send)
+                self.latency_list = self.latency_list[-50:]
             
-            self.rate_list.append(t_current_msg - self.t_last_msg)
-            self.rate_list = self.rate_list[-20:]
+            self.rate_list.append(t_current - self.t_last_msg)
+            self.rate_list = self.rate_list[-50:]
 
         else:
             self.has_header = "header" in msg[1].keys()
 
         # Always execute this code block
-        self.t_last_msg = t_current_msg
+        self.t_last_msg = t_current
         self.republisher.parse_and_publish(msg)
 
     def timestamp_to_secs(self, header_stamp: float):
@@ -144,7 +143,7 @@ class TopicHandler:
             timestamp to seconds.
         @return "float" value with the header timestamp.
         """
-        return header_stamp["sec"] + header_stamp["nanosec"] * 10 ** -9
+        return header_stamp["sec"] + header_stamp["nanosec"] * (10 ** -9)
 
     def get_topic_stats(self):
         """!
@@ -837,9 +836,6 @@ class TopicWidget(QWidget):
         self.setStyleSheet("QWidget#TopicWidget {border: 2px solid black;}")
 
         self.topic_name = topic_name
-
-        self.freq_lb = QLabel("XXX.XX")
-        self.latency_lb = QLabel("XXX.XX")
         
         bt_close = QPushButton("X")
         bt_close.clicked.connect(partial(
@@ -848,15 +844,23 @@ class TopicWidget(QWidget):
         ))
 
         lb_name = QLabel(self.topic_name)
+        lb_name.setObjectName("TopicName")
+
+        ly_top = QHBoxLayout()
+        ly_top.setContentsMargins(0, 0, 0, 0)
+        ly_top.addWidget(lb_name, stretch=100)
+        ly_top.addWidget(bt_close, stretch=1, alignment=Qt.AlignRight)
+
+        self.freq_lb = QLabel("XXX.XX")
+        self.latency_lb = QLabel("XXX.XX")
 
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
-        ly_widget.addWidget(lb_name, 0, 0, 1, 2)
+        ly_widget.addLayout(ly_top, 0, 0, 1, 2)
         ly_widget.addWidget(QLabel("Freq. [Hz]:"), 1, 0)
         ly_widget.addWidget(QLabel("DT [ms]:"), 2, 0)
         ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
         ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
-        ly_widget.addWidget(bt_close, 3, 0, 1, 2)
         self.setLayout(ly_widget)
 
     def update_topic_stats(self, frequency, latency, has_latency=True):
