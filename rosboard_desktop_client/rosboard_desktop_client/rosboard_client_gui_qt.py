@@ -307,9 +307,9 @@ class RosboardClientGui(QMainWindow):
             if self.retry_connection and self.is_connected:
                 self.restore_interface()
                 self.retry_connection = False
-                self.connection_widget.set_status_label(True)
+                self.connection_widget.set_status_label("CONNECTED")
             if self.retry_connection and not self.is_connected:
-                self.connection_widget.set_status_label(True, True)
+                self.connection_widget.set_status_label("RETRYING")
             else:
                 self.retry_connection = not self.is_connected
         else:
@@ -505,7 +505,7 @@ class RosboardClientGui(QMainWindow):
                 # Configure the connection widget to connected status
                 self.connection_widget.set_buttons_status(self.is_connected)
                 self.connection_widget.toggle_edits(False)
-                self.connection_widget.set_status_label(connected=True)
+                self.connection_widget.set_status_label("CONNECTED")
             
             except Exception as e:
                 self.show_warning_message("Timeout while connecting", "There was a timeout when trying to connect to server.")
@@ -535,7 +535,7 @@ class RosboardClientGui(QMainWindow):
         self.topics_panel_widget.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.connection_widget.set_buttons_status(self.is_connected)
-        self.connection_widget.set_status_label(connected=False)
+        self.connection_widget.set_status_label("DISCONNECTED")
 
     def add_topic_to_panel(self, topic_name):
         try:
@@ -630,7 +630,7 @@ class ConnectionWidget(QWidget):
     def set_status_label(self, status: str):
         """! Set the status label display based on parameters.
         
-        @param status "str" connection status to server. Valid keys 
+        @param status "str" connection status to server.
         """
         self.status_lb.setText(status)
         self.setStyleSheet(ConnectionWidget.CONN_STATUS_DICT[status])
@@ -902,7 +902,7 @@ class TopicWidget(QWidget):
         Update the node element color depending on topic state.
         @param state "str" represent the received messages values for topic.
         """
-        self.setStyleSheet(TopicWidget.TOPIC_STATE_DICT)
+        self.setStyleSheet(TopicWidget.TOPIC_STATE_DICT[state])
 
 
 def main():
