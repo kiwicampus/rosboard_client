@@ -168,11 +168,10 @@ class RosboardClientGui(QMainWindow):
         self.setMinimumSize(650, 400)
 
         # Load stylesheet
-        base_path = get_package_prefix("rosboard_desktop_client")
-        base_path = base_path.replace("install", "src") # It is dirty, I know
-        file_path = "rosboard_desktop_client/rosboard_desktop_client/resources/rosboard.qss"
-        full_path = os.path.join(base_path, file_path)
-        with open(full_path, 'r') as ss_file:
+        stylesheet_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "resources", "rosboard.qss"
+        )
+        with open(stylesheet_path, 'r') as ss_file:
             self.setStyleSheet(ss_file.read())
 
         # Start the ROS node
@@ -785,11 +784,19 @@ class TopicsPanelWidget(QWidget):
         self.widgets_list = []
 
     def add_topic(self, topic_name):
+        """!
+        Add topic to panel and configure the layout.
+        @param topic_name "str" name of the topic that will be added.
+        """
         topic_wg = TopicWidget(self, topic_name)
         self.widgets_list.append(topic_wg)
         self.configure_panel()
 
     def remove_topic(self, topic_name):
+        """!
+        Removes a topic from the panel and configure the layout.
+        @param topic_name "str" name of the topic that will be removed.
+        """
         for topic_wg in self.widgets_list:
             if topic_wg.topic_name == topic_name:
                 self.widgets_list.remove(topic_wg)
@@ -797,11 +804,19 @@ class TopicsPanelWidget(QWidget):
         self.configure_panel()
 
     def remove_all_topics(self):
+        """!
+        Removes every topic from the panel.
+        """
         topic_names = [topic_wg.topic_name for topic_wg in self.widgets_list]
         for tn in topic_names:
             self.remove_topic(tn)
 
     def update_topic_stats(self, topic_stats):
+        """!
+        Update the statistics for topics in panel.
+        @param topic_stats "dict" dictionary with the topic stats. Dictionary
+            key is topic name and value is a list with topic statistics.
+        """
         for widget in self.widgets_list:
             stats = topic_stats[widget.topic_name]
             widget.update_topic_stats(stats[0], stats[1])
@@ -833,10 +848,7 @@ class TopicWidget(QWidget):
     def __init__(self, parent, topic_name):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicWidget")
-        # TODO: remove stylesheet and add to .qss file.
-        #self.setAutoFillBackground(True)
         self.setAttribute(Qt.WA_StyledBackground)
-        self.setStyleSheet("QWidget#TopicWidget {border: 2px solid black;}")
 
         self.topic_name = topic_name
         
@@ -850,6 +862,7 @@ class TopicWidget(QWidget):
         lb_name.setObjectName("TopicName")
 
         ly_top = QHBoxLayout()
+        ly_top.setSpacing(5)
         ly_top.setContentsMargins(0, 0, 0, 0)
         ly_top.addWidget(lb_name, stretch=100)
         ly_top.addWidget(bt_close, stretch=1, alignment=Qt.AlignRight)
