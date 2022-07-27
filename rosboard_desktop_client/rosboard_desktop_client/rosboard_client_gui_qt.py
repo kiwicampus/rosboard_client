@@ -461,6 +461,8 @@ class RosboardClientGui(QMainWindow):
                 "Target web socket is not enabled. Is the address correct?"
             )
             return False
+        except Exception as ge:
+            self.node.get_logger().error(f"There was an error while trying to test the connection to server: {ge}")
 
     def connect_to_server(self):
         """! Function to connect to rosboard server.
