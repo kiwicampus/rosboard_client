@@ -32,7 +32,8 @@ from rosboard_desktop_client.republishers import PublisherManager
 
 class TopicHandler:
 
-    ALPHA = 2.0 / (20.0 + 1.0)
+    AVG_SAMPLES = 20
+    ALPHA = 2.0 / (AVG_SAMPLES + 1.0)
     C_ALPHA = 1 - ALPHA
 
     def __init__(self, topic_name, client, node: Node):
@@ -124,10 +125,10 @@ class TopicHandler:
             if self.has_header:
                 t_send = self.timestamp_to_secs(msg[1]["header"]["stamp"])
                 self.latency_list.append(t_current - t_send)
-                self.latency_list = self.latency_list[-50:]
+                self.latency_list = self.latency_list[-TopicHandler.AVG_SAMPLES:]
             
             self.rate_list.append(t_current - self.t_last_msg)
-            self.rate_list = self.rate_list[-50:]
+            self.rate_list = self.rate_list[-TopicHandler.AVG_SAMPLES:]
 
         else:
             self.has_header = "header" in msg[1].keys()
