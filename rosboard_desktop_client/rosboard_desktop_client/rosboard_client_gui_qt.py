@@ -224,7 +224,7 @@ class RosboardClientGui(QMainWindow):
         roundtrip_timer.timeout.connect(self.update_roundtrip)
         download_speed_timer.timeout.connect(self.update_download_speed)
         cpu_usage_timer.start(250)
-        roundtrip_timer.start(250)
+        roundtrip_timer.start(500)
         download_speed_timer.start(250)
 
         # Create a timer to update the stats panel
