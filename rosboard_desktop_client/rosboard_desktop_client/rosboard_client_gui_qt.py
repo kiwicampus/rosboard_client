@@ -544,6 +544,9 @@ class RosboardClientGui(QMainWindow):
             msg.setText("Can not load topic message type!")
             msg.setWindowTitle("Can not load message!")
             msg.exec_()
+        except Exception as e:
+            self.node.get_logger().warning("Attempted to subscribe to unavailable topic!")
+
 
     def add_topic_to_list(self, topic_name):
         if topic_name in self.topic_handlers.keys():
