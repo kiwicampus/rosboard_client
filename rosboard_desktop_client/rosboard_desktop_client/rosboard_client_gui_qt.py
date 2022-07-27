@@ -352,6 +352,8 @@ class RosboardClientGui(QMainWindow):
                     pass
                 except NameLookupError as nle:
                     pass
+                except Exception as ge:
+                    self.node.get_logger().error(f"There was an error while getting roundtrip: {ge}")
         else:
             self.roundtrip = 0.0
 
