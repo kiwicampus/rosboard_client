@@ -44,7 +44,7 @@ class TopicHandler:
         @param client "RosboardClient" client for the topic.
         @param node "Node" ROS node instance to communicate with ROS.
         """
-
+        self.node = node
         self.client = client
         self.topic_name = topic_name
         self.has_header = False
@@ -59,10 +59,10 @@ class TopicHandler:
         message_type = client.get_topic_type(topic_name)
         default_publisher = PublisherManager.getDefaultPublisherForType(message_type)
         self.republisher = default_publisher(
-            parent_node=node, topic_name=topic_name, topic_class_name=message_type
+            parent_node=self.node, topic_name=self.topic_name, topic_class_name=message_type
         )
         self.client.create_socket_subscription(
-            message_type, topic_name, self.topic_callback
+            message_type, self.topic_name, self.topic_callback
         )
 
         # Define member variables to store values
@@ -81,7 +81,7 @@ class TopicHandler:
 
     def close_connection(self):
         """! Close the connection to the topic."""
-        rclpy.logging.get_logger("rosboard_desktop_client").info(f"Closing connection for {self.topic_name}")
+        self.node.get_logger().info(f"Closing connection for {self.topic_name}")
         self.client.destroy_socket_subscription(self.topic_name)
         self.running = False
 
