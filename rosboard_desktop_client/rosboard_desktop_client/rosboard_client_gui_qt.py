@@ -543,11 +543,7 @@ class RosboardClientGui(QMainWindow):
             self.topics_list_widget.remove_topic(topic_name)
             self.topics_panel_widget.add_topic(topic_name)
         except ModuleNotFoundError as e:
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Warning)
-            msg.setText("Can not load topic message type!")
-            msg.setWindowTitle("Can not load message!")
-            msg.exec_()
+            self.show_warning_message("Can not load message!", "Can not load topic message type!")
         except Exception as e:
             self.node.get_logger().warning("Attempted to subscribe to unavailable topic!")
 
