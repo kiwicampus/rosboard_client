@@ -569,6 +569,13 @@ class ConnectionWidget(QWidget):
     """!
     Widget that contains the required elements to connect to websocket.
     """
+
+    CONN_STATUS_DICT = {
+        "RETRYING":"QLabel#StatusLabel{background-color: #FFE666;}",
+        "CONNECTED":"QLabel#StatusLabel{background-color: #77CC66;}",
+        "DISCONNECTED":"QLabel#StatusLabel{background-color: #FF6666;}"
+    }
+
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
         self.setObjectName("ConnectionWidget")
@@ -620,24 +627,13 @@ class ConnectionWidget(QWidget):
         """
         self.address_le.setEnabled(enabled)
 
-    def set_status_label(self, connected: bool, retry: bool = False):
+    def set_status_label(self, status: str):
         """! Set the status label display based on parameters.
         
-        @param connected "bool" indicate if the interface is connected to the
-        server or not.
-        @param retry "bool" indicate if the interface is retrying to establish
-        a connection.
-         """
-        if connected:
-            if retry:
-                self.status_lb.setText("RETRYING")
-                self.setStyleSheet("QLabel#StatusLabel{background-color: #FFE666;}")
-            else:
-                self.status_lb.setText("CONNECTED")
-                self.setStyleSheet("QLabel#StatusLabel{background-color: #77CC66;}")
-        else:
-            self.status_lb.setText("DISCONNECTED")
-            self.setStyleSheet("QLabel#StatusLabel{background-color: #FF6666;}")
+        @param status "str" connection status to server. Valid keys 
+        """
+        self.status_lb.setText(status)
+        self.setStyleSheet(ConnectionWidget.CONN_STATUS_DICT[status])
 
 
 class StatsWidget(QWidget):
@@ -846,6 +842,13 @@ class TopicWidget(QWidget):
     topic name, received frequency and time delay.
     @param topic_name "str"
     """
+
+    TOPIC_STATE_DICT = {
+        "DELAY":"QWidget#TopicWidget{background-color: #FF6666;}",
+        "NORMAL":"QWidget#TopicWidget{background-color: #77CC66;}",
+        "NO_DATA":"QWidget#TopicWidget{background-color: #B0B0B0;}"
+    }
+
     def __init__(self, parent, topic_name):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicWidget")
@@ -899,12 +902,7 @@ class TopicWidget(QWidget):
         Update the node element color depending on topic state.
         @param state "str" represent the received messages values for topic.
         """
-        if state == "DELAY":
-            self.setStyleSheet("QWidget#TopicWidget{background-color: #FF6666;}")
-        elif state == "NORMAL":
-            self.setStyleSheet("QWidget#TopicWidget{background-color: #77CC66;}")
-        else:
-            self.setStyleSheet("QWidget#TopicWidget{background-color: #B0B0B0;}")
+        self.setStyleSheet(TopicWidget.TOPIC_STATE_DICT)
 
 
 def main():
