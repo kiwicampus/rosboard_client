@@ -79,8 +79,8 @@ class TopicHandler:
         """! Class destructor. Used to stop threads from continuous execution. """
         self.running = False
 
-    def close_connection(self):
-        """! Close the connection to the topic."""
+    def destroy_subscription(self):
+        """! Destroy the subscription to the topic."""
         self.node.get_logger().info(f"Closing connection for {self.topic_name}")
         self.client.destroy_socket_subscription(self.topic_name)
         self.running = False
@@ -323,7 +323,7 @@ class RosboardClientGui(QMainWindow):
 
         # Delete the topic handlers.
         for topic in list(self.topic_handlers.keys()):
-            self.topic_handlers[topic].close_connection()
+            self.topic_handlers[topic].destroy_subscription()
             del self.topic_handlers[topic]
         
         # Clean the interface
@@ -520,7 +520,7 @@ class RosboardClientGui(QMainWindow):
 
         # Destroy the socket connections for each topic
         for topic in list(self.topic_handlers.keys()):
-            self.topic_handlers[topic].close_connection()
+            self.topic_handlers[topic].destroy_subscription()
             del self.topic_handlers[topic]
 
         # Reset the interface network attributes
@@ -547,7 +547,7 @@ class RosboardClientGui(QMainWindow):
 
     def add_topic_to_list(self, topic_name):
         if topic_name in self.topic_handlers.keys():
-            self.topic_handlers[topic_name].close_connection()
+            self.topic_handlers[topic_name].destroy_subscription()
             del self.topic_handlers[topic_name]
             self.topics_panel_widget.remove_topic(topic_name)
         self.topics_list_widget.add_topic(topic_name)
