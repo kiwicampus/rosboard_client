@@ -154,8 +154,8 @@ class TopicHandler:
         """
         t_average = self.calculate_average(self.rate_list)
         self.rate = 1.0 / t_average if t_average != 0.0 else 0.0
-        self.latency = self.calculate_average(self.latency_list) if self.has_header else 0.0
-        return [self.rate, self.latency, self.has_header]
+        self.latency = self.calculate_average(self.latency_list) if self.has_header else None
+        return [self.rate, self.latency]
 
 
 class RosboardClientGui(QMainWindow):
@@ -804,7 +804,7 @@ class TopicsPanelWidget(QWidget):
     def update_topic_stats(self, topic_stats):
         for widget in self.widgets_list:
             stats = topic_stats[widget.topic_name]
-            widget.update_topic_stats(stats[0], stats[1], stats[2])
+            widget.update_topic_stats(stats[0], stats[1])
 
     def update_topic_state(self, topic_state):
         for widget in self.widgets_list:
@@ -866,14 +866,14 @@ class TopicWidget(QWidget):
         ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
         self.setLayout(ly_widget)
 
-    def update_topic_stats(self, frequency, latency, has_latency=True):
+    def update_topic_stats(self, frequency, latency):
         """!
         Update the topic statistics: frequency and latency.
         @param frequency "float" value.
-        @param latency "float" value.
-        @param has_latency "bool" flag to indicate wheter the topic has 
+        @param latency "float" value. Might be 'None' to indicate latency is not present.
         latency calculations or not.
         """
+        has_latency = latency is not None
         self.freq_lb.setText(f"{frequency:3.2f}")
         if has_latency:
             self.latency_lb.setText(f"{latency * 1000:3.2f}")
