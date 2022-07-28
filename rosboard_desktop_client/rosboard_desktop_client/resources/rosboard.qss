@@ -105,6 +105,7 @@ QWidget#TopicWidget QLabel#TopicName {
 
 QWidget#TopicWidget QPushButton {
     padding: 5px;
+    margin: 3px 0;
     border-width: 2px;
     background-color: #D92B2B;
 }
