@@ -7,11 +7,16 @@ QWidget {
 }
 
 QLineEdit {
-    color: #FFFFFF;
+    color: #000000;
     border-radius: 0;
     margin: 0 5px;
     padding: 5px;
-    background-color: #424242;
+    background-color: #D6D6D6;
+}
+
+QLineEdit:disabled {
+    color: #D6D6D6;
+    background-color: #303030;
 }
 
 QPushButton {
