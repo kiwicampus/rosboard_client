@@ -10,6 +10,7 @@ Code Information:
 
 # =============================================================================
 import os
+import re
 import sys
 
 import rclpy
@@ -160,6 +161,8 @@ class TopicHandler:
 
 
 class RosboardClientGui(QMainWindow):
+
+    URL_RE = "^((?P<scheme>[^:/?#]+):(?=//))?(//)?(((?P<login>[^:]+)(?::(?P<password>[^@]+)?)?@)?(?P<host>[^@/?#:]*)(?::(?P<port>\d+)?)?)?(?P<path>[^?#]*)(\?(?P<query>[^#]*))?"
 
     # List to store the valid protocols
     valid_protocols = ["ws", "wss", "http", "https", "tcp"]
@@ -408,31 +411,14 @@ class RosboardClientGui(QMainWindow):
 
         @param address "str" input address that will be processed.
 
-        @return "bool" indicates if processing was successful or not.
         @return "str" host address for connection.
         @return "int" port for connection.
         """
-        parameters = address.split(':')
-        if len(parameters) == 3:
-            if parameters[0] in RosboardClientGui.valid_protocols:
-                try:
-                    return True, parameters[1].strip("//"), int(parameters[2])
-                except ValueError as e:
-                    return False, "", 0
-            else:
-                return False, "", 0
+        match = re.search(RosboardClientGui.URL_RE, address)
+        host = match.group("host")
+        port = match.group("port") if match.group("port") is not None else 80
+        return host, port
 
-        elif len(parameters) == 2:
-            if parameters[0] in RosboardClientGui.valid_protocols:
-                return True, parameters[1].strip("//"), 80
-            else:
-                try:
-                    return True, parameters[0].strip("//"), int(parameters[1])
-                except ValueError as ve:
-                    return False, "", 0
-
-        if len(parameters) == 1:
-            return True, parameters[0], 80
 
     def test_connection(self, host: str, port: int) -> bool:
         """!
@@ -475,11 +461,10 @@ class RosboardClientGui(QMainWindow):
         """
         # Get the connection parameters from the connection widget.
         address = self.connection_widget.get_connection_address()
-        valid, host, port = self.process_connection_address(address)
+        host, port = self.process_connection_address(address)
 
         # Test the connection before connecting.
-        if valid and self.test_connection(host, port):
-
+        if self.test_connection(host, port):
             try:
                 # Connect to the rosboard client
                 self.client = RosboardClient(
