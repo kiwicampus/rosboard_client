@@ -25,7 +25,21 @@ from socket import socket, AF_INET, SOCK_STREAM, gaierror
 
 from functools import partial
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGridLayout, QLineEdit, QPushButton, QScrollArea, QGroupBox, QMessageBox, QSplitter
+from PyQt5.QtWidgets import (
+    QMainWindow,
+    QApplication,
+    QWidget,
+    QLabel,
+    QHBoxLayout,
+    QVBoxLayout,
+    QGridLayout,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QGroupBox,
+    QMessageBox,
+    QSplitter,
+)
 
 from rosboard_desktop_client.networking import RosboardClient
 from rosboard_desktop_client.republishers import PublisherManager
@@ -38,9 +52,12 @@ class TopicHandler:
     C_ALPHA = 1 - ALPHA
 
     def __init__(self, topic_name, client, node: Node):
-        """! Class to handle the node behavior. 
-        This class provides statistics measurements for topics such as the
-        current latency and publish rate.
+        """! Class to handle the topic subscription and statistics.
+
+        This class provides a mechanism to connect a topic to the
+
+        statistics measurements for topics such as the
+        current latency and publish
 
         @param topic_name "str" name of the topic being handled.
         @param client "RosboardClient" client for the topic.
@@ -61,7 +78,9 @@ class TopicHandler:
         message_type = client.get_topic_type(topic_name)
         default_publisher = PublisherManager.getDefaultPublisherForType(message_type)
         self.republisher = default_publisher(
-            parent_node=self.node, topic_name=self.topic_name, topic_class_name=message_type
+            parent_node=self.node,
+            topic_name=self.topic_name,
+            topic_class_name=message_type,
         )
         self.client.create_socket_subscription(
             message_type, self.topic_name, self.topic_callback
@@ -78,7 +97,7 @@ class TopicHandler:
         self.th_state.start()
 
     def __del__(self):
-        """! Class destructor. Used to stop threads from continuous execution. """
+        """! Class destructor. Used to stop threads from continuous execution."""
         self.running = False
 
     def destroy_subscription(self):
@@ -110,7 +129,10 @@ class TopicHandler:
             average = time_list[0]
             if list_size > 1:
                 for indx in range(1, list_size):
-                    average = TopicHandler.ALPHA * time_list[indx] + TopicHandler.C_ALPHA * average
+                    average = (
+                        TopicHandler.ALPHA * time_list[indx]
+                        + TopicHandler.C_ALPHA * average
+                    )
         return average
 
     def topic_callback(self, msg):
@@ -118,7 +140,7 @@ class TopicHandler:
         Topic callback function for incoming rosboard messages.
 
         This function processes the incoming messages in order to provide the
-        stats of the 
+        stats of the
         """
         self.n_msgs += 1
         t_current = time()
@@ -126,10 +148,10 @@ class TopicHandler:
             if self.has_header:
                 t_send = self.timestamp_to_secs(msg[1]["header"]["stamp"])
                 self.latency_list.append(t_current - t_send)
-                self.latency_list = self.latency_list[-TopicHandler.AVG_SAMPLES:]
-            
+                self.latency_list = self.latency_list[-TopicHandler.AVG_SAMPLES :]
+
             self.rate_list.append(t_current - self.t_last_msg)
-            self.rate_list = self.rate_list[-TopicHandler.AVG_SAMPLES:]
+            self.rate_list = self.rate_list[-TopicHandler.AVG_SAMPLES :]
 
         else:
             self.has_header = "header" in msg[1].keys()
@@ -145,7 +167,7 @@ class TopicHandler:
             timestamp to seconds.
         @return "float" value with the header timestamp.
         """
-        return header_stamp["sec"] + header_stamp["nanosec"] * (10 ** -9)
+        return header_stamp["sec"] + header_stamp["nanosec"] * (10**-9)
 
     def get_topic_stats(self):
         """!
@@ -156,7 +178,9 @@ class TopicHandler:
         """
         t_average = self.calculate_average(self.rate_list)
         self.rate = 1.0 / t_average if t_average != 0.0 else 0.0
-        self.latency = self.calculate_average(self.latency_list) if self.has_header else None
+        self.latency = (
+            self.calculate_average(self.latency_list) if self.has_header else None
+        )
         return [self.rate, self.latency]
 
 
@@ -175,7 +199,7 @@ class RosboardClientGui(QMainWindow):
         stylesheet_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "resources", "rosboard.qss"
         )
-        with open(stylesheet_path, 'r') as ss_file:
+        with open(stylesheet_path, "r") as ss_file:
             self.setStyleSheet(ss_file.read())
 
         # Start the ROS node
@@ -207,7 +231,7 @@ class RosboardClientGui(QMainWindow):
         ly_main = QVBoxLayout()
         ly_main.addLayout(ly_top, stretch=1)
         ly_main.addWidget(splitter_bottom, stretch=10)
-        
+
         # Define the central widget and set the layout
         wg_main = QWidget(self)
         wg_main.setLayout(ly_main)
@@ -248,7 +272,7 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
 
     def closeEvent(self, event):
-        """! Function for handling the close interface. """
+        """! Function for handling the close interface."""
         RosboardClient.stop_reactor()
         if self.client is not None:
             if self.client.protocol.is_connected:
@@ -256,7 +280,7 @@ class RosboardClientGui(QMainWindow):
         super(QMainWindow, self).closeEvent(event)
 
     def resizeEvent(self, event):
-        """ Update the user interface on resize. """
+        """Update the user interface on resize."""
         self.configure_topics_panel()
         super().resizeEvent(event)
 
@@ -319,7 +343,7 @@ class RosboardClientGui(QMainWindow):
             self.is_connected = False
 
     def restore_interface(self):
-        """! Restore the interface after a reconnection. """
+        """! Restore the interface after a reconnection."""
         self.node.get_logger().info("Restoring interface after reconnection.")
         # Get current topics to restore them later.
         current_topics = self.topics_panel_widget.get_current_topics()
@@ -328,11 +352,11 @@ class RosboardClientGui(QMainWindow):
         for topic in list(self.topic_handlers.keys()):
             self.topic_handlers[topic].destroy_subscription()
             del self.topic_handlers[topic]
-        
+
         # Clean the interface
         self.topics_list_widget.remove_all_topics()
         self.topics_panel_widget.remove_all_topics()
-        
+
         # Configure the interface
         available_topics = self.client.get_available_topics()
         for topic in available_topics:
@@ -341,38 +365,43 @@ class RosboardClientGui(QMainWindow):
             self.add_topic_to_panel(topic)
 
     def update_cpu_usage(self):
-        """! Update the CPU usage statistic value. """
+        """! Update the CPU usage statistic value."""
         self.cpu_usage = cpu_percent()
 
     def update_roundtrip(self):
-        """! Update the roundtrip response time value. """
+        """! Update the roundtrip response time value."""
         if self.client is not None:
             if self.client.protocol.is_connected:
                 try:
-                    ping_response = ping(address=self.server_ip_addr, count=1, timeout=0.5, privileged=False)
+                    ping_response = ping(
+                        address=self.server_ip_addr,
+                        count=1,
+                        timeout=0.5,
+                        privileged=False,
+                    )
                     self.roundtrip = ping_response.avg_rtt
                 except gaierror as ge:
                     pass
                 except NameLookupError as nle:
                     pass
                 except Exception as ge:
-                    self.node.get_logger().error(f"There was an error while getting roundtrip: {ge}")
+                    self.node.get_logger().error(
+                        f"There was an error while getting roundtrip: {ge}"
+                    )
         else:
             self.roundtrip = 0.0
 
     def update_download_speed(self):
-        """! Update the download speed statistic value. """
+        """! Update the download speed statistic value."""
         net_if_stats_val = net_io_counters()
         received_bytes = net_if_stats_val.bytes_recv - self.old_bytes_recv
         self.old_bytes_recv = net_if_stats_val.bytes_recv
         self.download_speed = (received_bytes / 1024.0) / 0.25
 
     def update_stats(self):
-        """! Update the statistics value in the user interface. """
+        """! Update the statistics value in the user interface."""
         self.stats_widget.update_stats_widget(
-            self.cpu_usage,
-            self.roundtrip,
-            self.download_speed
+            self.cpu_usage, self.roundtrip, self.download_speed
         )
 
     def update_available_topics(self):
@@ -381,9 +410,9 @@ class RosboardClientGui(QMainWindow):
         This function checks for the currently available topics from the
         server. If a topic is not in the interface but in the available
         topics, it is added to the topic list.
-        
+
         If a topic is in the interface but not in the available topics, it is
-        removed only if it is in the topic list. If topic is in the topics 
+        removed only if it is in the topic list. If topic is in the topics
         panel, it will not be removed.
         """
         # Check if the client is connected to the server
@@ -419,7 +448,6 @@ class RosboardClientGui(QMainWindow):
         port = match.group("port") if match.group("port") is not None else 80
         return host, port
 
-
     def test_connection(self, host: str, port: int) -> bool:
         """!
         Check the websocket status and enable the connect button.
@@ -431,24 +459,25 @@ class RosboardClientGui(QMainWindow):
             test_socket.close()
             if not is_avail:
                 self.show_warning_message(
-                    "Can not connect to server!",
-                    "Connection error!"
+                    "Can not connect to server!", "Connection error!"
                 )
             return is_avail
         except ValueError as e:
             self.show_warning_message(
                 "Target web socket is not enabled. Is the port correct?",
-                "Target web socket is not enabled!"
+                "Target web socket is not enabled!",
             )
             return False
         except gaierror as e:
             self.show_warning_message(
                 "Target web socket is not enabled!",
-                "Target web socket is not enabled. Is the address correct?"
+                "Target web socket is not enabled. Is the address correct?",
             )
             return False
         except Exception as ge:
-            self.node.get_logger().error(f"There was an error while trying to test the connection to server: {ge}")
+            self.node.get_logger().error(
+                f"There was an error while trying to test the connection to server: {ge}"
+            )
 
     def connect_to_server(self):
         """! Function to connect to rosboard server.
@@ -468,8 +497,7 @@ class RosboardClientGui(QMainWindow):
             try:
                 # Connect to the rosboard client
                 self.client = RosboardClient(
-                    host=f"{host}:{port}", 
-                    connection_timeout=5.0
+                    host=f"{host}:{port}", connection_timeout=5.0
                 )
 
                 # Get topics list and add them to the topics list widget.
@@ -491,15 +519,18 @@ class RosboardClientGui(QMainWindow):
                 self.connection_widget.set_buttons_status(self.is_connected)
                 self.connection_widget.toggle_edits(False)
                 self.connection_widget.set_status_label("CONNECTED")
-            
+
             except Exception as e:
-                self.show_warning_message("Timeout while connecting", "There was a timeout when trying to connect to server.")
+                self.show_warning_message(
+                    "Timeout while connecting",
+                    "There was a timeout when trying to connect to server.",
+                )
 
     def disconnect_from_server(self):
         """! Disconnects the interface from the rosboard server.
 
         This function will destroy the socket connections to topics in the
-        server, destroy the connection and restore the interface to its 
+        server, destroy the connection and restore the interface to its
         disconnected status.
         """
         # Stop timers to update topics list, stats and interface restore.
@@ -524,14 +555,19 @@ class RosboardClientGui(QMainWindow):
 
     def add_topic_to_panel(self, topic_name):
         try:
-            self.topic_handlers[topic_name] = TopicHandler(topic_name, self.client, self.node)
+            self.topic_handlers[topic_name] = TopicHandler(
+                topic_name, self.client, self.node
+            )
             self.topics_list_widget.remove_topic(topic_name)
             self.topics_panel_widget.add_topic(topic_name)
         except ModuleNotFoundError as e:
-            self.show_warning_message("Can not load message!", "Can not load topic message type!")
+            self.show_warning_message(
+                "Can not load message!", "Can not load topic message type!"
+            )
         except Exception as e:
-            self.node.get_logger().warning("Attempted to subscribe to unavailable topic!")
-
+            self.node.get_logger().warning(
+                "Attempted to subscribe to unavailable topic!"
+            )
 
     def add_topic_to_list(self, topic_name):
         if topic_name in self.topic_handlers.keys():
@@ -548,7 +584,7 @@ class RosboardClientGui(QMainWindow):
             topic_state[topic] = self.topic_handlers[topic].state
         self.topics_panel_widget.update_topic_stats(topic_stats)
         self.topics_panel_widget.update_topic_state(topic_state)
-        
+
 
 class ConnectionWidget(QWidget):
     """!
@@ -556,9 +592,9 @@ class ConnectionWidget(QWidget):
     """
 
     CONN_STATUS_DICT = {
-        "RETRYING":"QLabel#StatusLabel{background-color: #FFE666;}",
-        "CONNECTED":"QLabel#StatusLabel{background-color: #77CC66;}",
-        "DISCONNECTED":"QLabel#StatusLabel{background-color: #FF6666;}"
+        "RETRYING": "QLabel#StatusLabel{background-color: #FFE666;}",
+        "CONNECTED": "QLabel#StatusLabel{background-color: #77CC66;}",
+        "DISCONNECTED": "QLabel#StatusLabel{background-color: #FF6666;}",
     }
 
     def __init__(self, parent):
@@ -585,13 +621,13 @@ class ConnectionWidget(QWidget):
         # Define the widget layout
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
-        ly_widget.setContentsMargins(0, 0, 0, 0)        
+        ly_widget.setContentsMargins(0, 0, 0, 0)
         ly_widget.addWidget(QLabel("ADDRESS:"), 0, 0, 1, 2, Qt.AlignCenter)
         ly_widget.addWidget(self.address_le, 1, 0, 1, 2)
         ly_widget.addWidget(self.connect_bt, 2, 0)
         ly_widget.addWidget(self.disconnect_bt, 2, 1)
         ly_widget.addWidget(self.status_lb, 3, 0, 1, 2, Qt.AlignCenter)
-        
+
         self.setLayout(ly_widget)
 
     def get_connection_address(self):
@@ -614,7 +650,7 @@ class ConnectionWidget(QWidget):
 
     def set_status_label(self, status: str):
         """! Set the status label display based on parameters.
-        
+
         @param status "str" connection status to server.
         """
         self.status_lb.setText(status)
@@ -628,9 +664,10 @@ class StatsWidget(QWidget):
     the round trip time to the connected socket, and the current
     download speed.
     """
+
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
-        
+
         # Define the labels to store the stats. values.
         self.cpu_usage_lb = QLabel("CPU USAGE: XXX.XX \t \t %")
         self.roundtrip_lb = QLabel("ROUNDTRIP: XXX.XX \t \t ms")
@@ -659,6 +696,7 @@ class TopicsListWidget(QWidget):
     """!
     Widget that contains the required elements to connect to websocket.
     """
+
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsListWidget")
@@ -686,7 +724,7 @@ class TopicsListWidget(QWidget):
     def add_topic(self, topic_name):
         """!
         Add a button to the topic list in the panel in alphabetic order.
-        @param topic_name "str" name of the topic that will be linked to the button. 
+        @param topic_name "str" name of the topic that will be linked to the button.
         """
         # Add topic to list and get index
         current_topics = [bt.text() for bt in self.topic_btns]
@@ -696,7 +734,9 @@ class TopicsListWidget(QWidget):
 
         # Insert the button into widget
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.parent().parent().parent().add_topic_to_panel, topic_name))
+        bt_topic.clicked.connect(
+            partial(self.parent().parent().parent().add_topic_to_panel, topic_name)
+        )
         self.topic_btns.insert(topic_indx + 1, bt_topic)
         self.ly_topics.insertWidget(topic_indx, bt_topic)
 
@@ -705,7 +745,9 @@ class TopicsListWidget(QWidget):
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.parent().parent().parent().add_topic_to_panel, topic_name))
+        bt_topic.clicked.connect(
+            partial(self.parent().parent().parent().add_topic_to_panel, topic_name)
+        )
         self.topic_btns.append(bt_topic)
         self.ly_topics.addWidget(self.topic_btns[-1])
 
@@ -719,7 +761,7 @@ class TopicsListWidget(QWidget):
                 button.deleteLater()
 
     def remove_all_topics(self):
-        """! Remove all topics from widget. """
+        """! Remove all topics from widget."""
         topic_names = [btn.text() for btn in self.topic_btns]
         for tn in topic_names:
             self.remove_topic(tn)
@@ -735,6 +777,7 @@ class TopicsPanelWidget(QWidget):
     """!
     Widget that contains the required elements to connect to websocket.
     """
+
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsPanelWidget")
@@ -742,7 +785,7 @@ class TopicsPanelWidget(QWidget):
 
         # Define attributes for max. columns
         self.MAX_COLS = 4
-        
+
         # Define the layout for the widget
         self.ly_widget = QGridLayout()
         self.ly_widget.setAlignment(Qt.AlignTop)
@@ -752,7 +795,6 @@ class TopicsPanelWidget(QWidget):
         topics_gb.setObjectName("topics_gb")
         topics_gb.setLayout(self.ly_widget)
         topics_gb.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
-
 
         scroll_area = QScrollArea()
         scroll_area.setWidget(topics_gb)
@@ -811,7 +853,9 @@ class TopicsPanelWidget(QWidget):
     def configure_panel(self):
         count = 0
         for widget in self.widgets_list:
-            self.ly_widget.addWidget(widget, count // self.MAX_COLS, count % self.MAX_COLS)
+            self.ly_widget.addWidget(
+                widget, count // self.MAX_COLS, count % self.MAX_COLS
+            )
             count += 1
 
     def get_current_topics(self):
@@ -829,9 +873,9 @@ class TopicWidget(QWidget):
     """
 
     TOPIC_STATE_DICT = {
-        "DELAY":"QWidget#TopicWidget{background-color: #FF6666;}",
-        "NORMAL":"QWidget#TopicWidget{background-color: #77CC66;}",
-        "NO_DATA":"QWidget#TopicWidget{background-color: #B0B0B0;}"
+        "DELAY": "QWidget#TopicWidget{background-color: #FF6666;}",
+        "NORMAL": "QWidget#TopicWidget{background-color: #77CC66;}",
+        "NO_DATA": "QWidget#TopicWidget{background-color: #B0B0B0;}",
     }
 
     def __init__(self, parent, topic_name):
@@ -840,12 +884,14 @@ class TopicWidget(QWidget):
         self.setAttribute(Qt.WA_StyledBackground)
 
         self.topic_name = topic_name
-        
+
         bt_close = QPushButton("X")
-        bt_close.clicked.connect(partial(
-            self.parent().parent().parent().parent().add_topic_to_list,
-            self.topic_name
-        ))
+        bt_close.clicked.connect(
+            partial(
+                self.parent().parent().parent().parent().add_topic_to_list,
+                self.topic_name,
+            )
+        )
 
         lb_name = QLabel(self.topic_name)
         lb_name.setObjectName("TopicName")
