@@ -298,8 +298,8 @@ class RosboardClientGui(QMainWindow):
 
     def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
         """! Function for handling the close interface."""
-        RosboardClient.stop_reactor()
         if self.client is not None:
+            self.client.stop_reactor()
             if self.client.protocol.is_connected:
                 self.disconnect_from_server()
         super(QMainWindow, self).closeEvent(event)

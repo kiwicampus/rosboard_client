@@ -280,15 +280,14 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         try:
             reactor.run(False)
         except ReactorAlreadyRunning as e:
-            self.logger.warning("Reactor not stated as its already running.")
+            self.logger.warning("Reactor not started as its already running.")
 
-    @staticmethod
-    def stop_reactor():
+    def stop_reactor(self):
         """! Function to stop the reactor. Handles the error if the reactor is not running. """
         try:
             reactor.stop()
         except ReactorNotRunning as e:
-            pass
+            self.logger.warning("Reactor not stopped as it was not running.")
 
     def create_socket_subscription(self, msg_type: str, topic: str, callback) -> None:
         """! Function to subscribe to a topic available in the rosboard server
