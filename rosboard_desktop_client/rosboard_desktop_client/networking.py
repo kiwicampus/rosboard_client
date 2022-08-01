@@ -280,7 +280,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         try:
             reactor.run(False)
         except ReactorAlreadyRunning as e:
-            pass
+            self.logger.warning("Reactor not stated as its already running.")
 
     @staticmethod
     def stop_reactor():
