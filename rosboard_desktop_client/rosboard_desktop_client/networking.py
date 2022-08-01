@@ -219,7 +219,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
     
     protocol = RosboardClientProtocol
 
-    # Reconnecting client factory configs
+    # Specify the max time between connection attempts on reconnection
     maxDelay = 2.0
 
     def __init__(self, host: str, connection_timeout: float):
@@ -388,8 +388,6 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
     def clientConnectionLost(self, connector, reason):
         """!
         Function executed when the connection to the server is lost
-        Raises:
-            Exception: Always raises an exception, the connection with the server should not be lost
         """
         self.is_connected = False
         self.logger.error(f"Lost connection with {self.url}, reason: {reason}")
@@ -398,8 +396,6 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
     def clientConnectionFailed(self, connector, reason):
         """!
         Function executed when the client cannot establish a connection with the server
-        Raises:
-            Exception: Always raises an exception. Connection should not fail
         """
         self.is_connected = False
         self.logger.error(f"Failed to connect to {self.url}, reason: {reason}")
