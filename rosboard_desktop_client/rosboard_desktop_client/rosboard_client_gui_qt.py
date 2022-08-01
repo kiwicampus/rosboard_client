@@ -49,11 +49,7 @@ from rosboard_desktop_client.republishers import PublisherManager
 
 class TopicHandler:
 
-    AVG_SAMPLES = 20
-    ALPHA = 2.0 / (AVG_SAMPLES + 1.0)
-    C_ALPHA = 1 - ALPHA
-
-    def __init__(self, topic_name: str, client: RosboardClient, node: Node):
+    def __init__(self, topic_name: str, client: RosboardClient, node: Node, alpha: float=0.1):
         """! Class to handle the topic subscription and statistics.
 
         This class provides a mechanism to connect a topic to the rosboard
@@ -70,10 +66,9 @@ class TopicHandler:
         self.topic_name = topic_name
         self.has_header = False
         self.rate = 0.0
-        self.avg_rate = 0.0
-        self.latency = 0.0
-        self.latency_list = []
-        self.rate_list = []
+        self.alpha = alpha
+        self.last_period = 0.0
+        self.last_latency = 0.0
         self.state = "NO_DATA"
 
         # Get the topic message type and create republisher
@@ -131,7 +126,7 @@ class TopicHandler:
                     self.state = "NORMAL"
             sleep(0.25)
 
-    def calculate_average(self, time_list: list) -> float:
+    def calculate_average(self, current_value: float, last_value: float) -> float:
         """! Calculate the exponentially weighted moving average.
 
         This function calculates the exponentially weighted moving average
@@ -140,46 +135,38 @@ class TopicHandler:
         'ALPHA' constant, which might depend on the expected number of items
         of the list.
 
-        @param time_list "list" contains the latest time values between
-        messages.
+        @param time_delta "float" 
         @return "float" with the average value. Return 0.0 if time_list has
         no values.
         """
-        average = 0.0
-        list_size = len(time_list)
-        if list_size > 0:
-            average = time_list[0]
-            if list_size > 1:
-                for indx in range(1, list_size):
-                    average = (
-                        TopicHandler.ALPHA * time_list[indx]
-                        + TopicHandler.C_ALPHA * average
-                    )
-        return average
+        if self.n_msgs == 0:
+            return current_value
+        else:
+            return self.alpha * current_value + (1.0 - self.alpha) * last_value
 
     def topic_callback(self, msg: list):
         """! Topic callback function for incoming rosboard messages.
 
         This function processes the incoming messages in order to provide the
-        stats of the
+        stats of the current topic handler. It adds one unit to the count of 
+        received messages. Then, it captures the current time, that is then used
+        to 
         """
-        self.n_msgs += 1
         t_current = time()
-        if self.t_last_msg is not None:
+        if self.n_msgs > 0:
             if self.has_header:
                 t_send = self.timestamp_to_secs(msg[1]["header"]["stamp"])
-                self.latency_list.append(t_current - t_send)
-                self.latency_list = self.latency_list[-TopicHandler.AVG_SAMPLES :]
-
-            self.rate_list.append(t_current - self.t_last_msg)
-            self.rate_list = self.rate_list[-TopicHandler.AVG_SAMPLES :]
-
+                current_latency = t_current - t_send
+                self.last_latency = self.calculate_average(current_latency, self.last_latency)
+            current_period = t_current - self.t_last_msg
+            self.last_period = self.calculate_average(current_period, self.last_period)
         else:
             self.has_header = "header" in msg[1].keys()
 
         # Always execute this code block
         self.t_last_msg = t_current
         self.republisher.parse_and_publish(msg)
+        self.n_msgs += 1
 
     def timestamp_to_secs(self, header_stamp: dict) -> float:
         """! Convert a header timestamp to a float value.
@@ -201,12 +188,8 @@ class TopicHandler:
         messages were received; the latency if the message includes a header, and
         a boolean indicating if the message has header.
         """
-        t_average = self.calculate_average(self.rate_list)
-        self.rate = 1.0 / t_average if t_average != 0.0 else 0.0
-        self.latency = (
-            self.calculate_average(self.latency_list) if self.has_header else None
-        )
-        return [self.rate, self.latency]
+        rate = 1.0 / self.last_period if self.last_period != 0.0 else 0.0
+        return [rate, self.last_latency]
 
 
 class RosboardClientGui(QMainWindow):
@@ -776,6 +759,7 @@ class TopicsListWidget(QWidget):
         # Insert the button into widget
         bt_topic = QPushButton(topic_name)
         bt_topic.clicked.connect(
+            # Calls add_topic_to_panel in RosboardClientGui
             partial(self.parent().parent().parent().add_topic_to_panel, topic_name)
         )
         self.topic_btns.insert(topic_indx + 1, bt_topic)
