@@ -12,6 +12,7 @@ Code Information:
 import os
 import re
 import sys
+from typing import Tuple
 
 import rclpy
 from rclpy.node import Node
@@ -24,6 +25,7 @@ from psutil import cpu_percent, net_io_counters
 from socket import socket, AF_INET, SOCK_STREAM, gaierror
 
 from functools import partial
+import PyQt5
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QMainWindow,
@@ -294,7 +296,7 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer = QTimer(self)
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
         """! Function for handling the close interface."""
         RosboardClient.stop_reactor()
         if self.client is not None:
@@ -302,7 +304,7 @@ class RosboardClientGui(QMainWindow):
                 self.disconnect_from_server()
         super(QMainWindow, self).closeEvent(event)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: PyQt5.QtGui.QResizeEvent):
         """Update the user interface on resize."""
         self.configure_topics_panel()
         super().resizeEvent(event)
@@ -334,7 +336,7 @@ class RosboardClientGui(QMainWindow):
         self.topic_handlers = {}
         self.available_topics = []
 
-    def show_warning_message(self, title, message):
+    def show_warning_message(self, title: str, message: str):
         """! Show a warning message box in the interface.
         @param title "str" title for the warning.
         @param message "str" content for the warning.
@@ -458,7 +460,7 @@ class RosboardClientGui(QMainWindow):
                     self.available_topics.append(topic)
                     self.add_topic_to_list(topic)
 
-    def process_connection_address(self, address: str):
+    def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
 
         @param address "str" input address that will be processed.
@@ -576,7 +578,7 @@ class RosboardClientGui(QMainWindow):
         self.connection_widget.set_buttons_status(self.is_connected)
         self.connection_widget.set_status_label("DISCONNECTED")
 
-    def add_topic_to_panel(self, topic_name):
+    def add_topic_to_panel(self, topic_name: str):
         try:
             self.topic_handlers[topic_name] = TopicHandler(
                 topic_name, self.client, self.node
@@ -592,7 +594,7 @@ class RosboardClientGui(QMainWindow):
                 "Attempted to subscribe to unavailable topic!"
             )
 
-    def add_topic_to_list(self, topic_name):
+    def add_topic_to_list(self, topic_name: str):
         if topic_name in self.topic_handlers.keys():
             self.topic_handlers[topic_name].destroy_subscription()
             del self.topic_handlers[topic_name]
