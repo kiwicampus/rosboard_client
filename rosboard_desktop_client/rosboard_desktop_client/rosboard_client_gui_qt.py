@@ -462,7 +462,7 @@ class RosboardClientGui(QMainWindow):
             for topic in current_topics:
                 if topic not in self.available_topics:
                     self.available_topics.append(topic)
-                    self.add_topic_to_list(topic)
+                    self.add_topic_to_list_remove_from_panel(topic)
 
     def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
@@ -598,7 +598,15 @@ class RosboardClientGui(QMainWindow):
                 "Attempted to subscribe to unavailable topic!"
             )
 
-    def add_topic_to_list(self, topic_name: str):
+    def add_topic_to_list_remove_from_panel(self, topic_name: str):
+        """! Add a topic to list widget and remove it from panel if necessary
+
+        Calling this method will add a given topic to the topics list in
+        TopicsListWidget. If the topic is being handled (is present in the)
+        topics panel, such handling will be terminated.
+
+        @param topic_name "str" topic that will be added to the topics list.
+        """
         if topic_name in self.topic_handlers.keys():
             self.topic_handlers[topic_name].destroy_subscription()
             del self.topic_handlers[topic_name]
@@ -918,7 +926,8 @@ class TopicWidget(QWidget):
         bt_close = QPushButton("X")
         bt_close.clicked.connect(
             partial(
-                self.parent().parent().parent().parent().add_topic_to_list,
+                # Call add_topic_to_list_remove_from_panel at RosboardClientGUI instance
+                self.parent().parent().parent().parent().add_topic_to_list_remove_from_panel,
                 self.topic_name,
             )
         )
