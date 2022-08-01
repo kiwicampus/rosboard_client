@@ -51,18 +51,18 @@ class TopicHandler:
     ALPHA = 2.0 / (AVG_SAMPLES + 1.0)
     C_ALPHA = 1 - ALPHA
 
-    def __init__(self, topic_name, client, node: Node):
+    def __init__(self, topic_name: str, client: RosboardClient, node: Node):
         """! Class to handle the topic subscription and statistics.
 
-        This class provides a mechanism to connect a topic to the
-
-        statistics measurements for topics such as the
-        current latency and publish
+        This class provides a mechanism to connect a topic to the rosboard
+        client and to generate statistics measurements for topics such
+        as the current latency and rate in which messages are received.
 
         @param topic_name "str" name of the topic being handled.
         @param client "RosboardClient" client for the topic.
         @param node "Node" ROS node instance to communicate with ROS.
         """
+        # Initialize attributes
         self.node = node
         self.client = client
         self.topic_name = topic_name
@@ -97,7 +97,9 @@ class TopicHandler:
         self.th_state.start()
 
     def __del__(self):
-        """! Class destructor. Used to stop threads from continuous execution."""
+        """! Class destructor for TopicHandler.
+        Used to stop threads from continuous execution.
+        """
         self.running = False
 
     def destroy_subscription(self):
@@ -107,6 +109,16 @@ class TopicHandler:
         self.running = False
 
     def define_node_state(self):
+        """! Function that defines the node state.
+
+        The state depends on the time in which the latest message was received
+        and the frequency in which messages are received. If more than five
+        (5) seconds have passed since the latest received message, the topic
+        handler will enter into 'NO_DATA' state. If the rate in which messages
+        are received drop from 80% of the historic average rate, the topic
+        handler will enter into 'DELAY' state. If neither of this conditions
+        is achieved, the topic handler will be in a 'NORMAL' state.
+        """
         while self.running:
             if self.t_last_msg is not None:
                 if time() - self.t_last_msg > 5.0:
@@ -117,11 +129,19 @@ class TopicHandler:
                     self.state = "NORMAL"
             sleep(0.25)
 
-    def calculate_average(self, time_list):
-        """!
-        Calculate the exponentially weighted moving average.
-        @param time_list "list" contains the latest time values between messages.
-        @return "float" with the average value. Return 0.0 if time_list has no values.
+    def calculate_average(self, time_list: list) -> float:
+        """! Calculate the exponentially weighted moving average.
+
+        This function calculates the exponentially weighted moving average
+        (EWMA) for a given list of values. The function does not expect the
+        list to have a fixed value, although it will use the predefined
+        'ALPHA' constant, which might depend on the expected number of items
+        of the list.
+
+        @param time_list "list" contains the latest time values between
+        messages.
+        @return "float" with the average value. Return 0.0 if time_list has
+        no values.
         """
         average = 0.0
         list_size = len(time_list)
@@ -135,9 +155,8 @@ class TopicHandler:
                     )
         return average
 
-    def topic_callback(self, msg):
-        """!
-        Topic callback function for incoming rosboard messages.
+    def topic_callback(self, msg: list):
+        """! Topic callback function for incoming rosboard messages.
 
         This function processes the incoming messages in order to provide the
         stats of the
@@ -160,21 +179,25 @@ class TopicHandler:
         self.t_last_msg = t_current
         self.republisher.parse_and_publish(msg)
 
-    def timestamp_to_secs(self, header_stamp: float):
-        """!
-        Convert a header timestamp to a float value including nanoseconds.
-        @param header_stamp "float" header with fields using for converting the
-            timestamp to seconds.
+    def timestamp_to_secs(self, header_stamp: dict) -> float:
+        """! Convert a header timestamp to a float value.
+
+        @param header_stamp "dict" header with fields using for converting the
+        timestamp to seconds.
         @return "float" value with the header timestamp.
         """
         return header_stamp["sec"] + header_stamp["nanosec"] * (10**-9)
 
-    def get_topic_stats(self):
-        """!
-        Calculate and return the topic stats.
+    def get_topic_stats(self) -> list:
+        """! Calculate and return the topic statistics.
+
+        A simple process is followed to calculate the topic statistics: an
+        average for the time between messages is calculated using EMWA. This
+        value is inverted to
+
         @return "list" includes three (3) values: the rate in which the latest
-            messages were received; the latency if the message includes a header, and
-            a boolean indicating if the message has header.
+        messages were received; the latency if the message includes a header, and
+        a boolean indicating if the message has header.
         """
         t_average = self.calculate_average(self.rate_list)
         self.rate = 1.0 / t_average if t_average != 0.0 else 0.0
