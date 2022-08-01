@@ -732,7 +732,10 @@ class StatsWidget(QWidget):
 
 class TopicsListWidget(QWidget):
     """!
-    Widget that contains the required elements to connect to websocket.
+    Widget that contains the list of available topics in the server. The
+    topics are presented in the interface as a vertical list of buttons. As
+    one of these buttons is pressed, the interface will handle the interface
+    and the topic will be published in the client side.
     """
 
     def __init__(self, parent: RosboardClientGui):
@@ -813,7 +816,11 @@ class TopicsListWidget(QWidget):
 
 class TopicsPanelWidget(QWidget):
     """!
-    Widget that contains the required elements to connect to websocket.
+    Widget that contains the topics widgets associated to the handled topics.
+    Handled topics are the ones that are being published in the client side.
+    Elements in this widget consists of further widgets that include the topics
+    name and statistics. This widget is only responsible of organizing how such
+    widgets are presented.
     """
 
     def __init__(self, parent: RosboardClientGui):
@@ -906,8 +913,8 @@ class TopicsPanelWidget(QWidget):
 class TopicWidget(QWidget):
     """!
     Widget that will show the topic information. The widget includes the
-    topic name, received frequency and time delay.
-    @param topic_name "str"
+    topic name, received frequency and time delay. A close button will 
+    remove the topic widget and close the handling of the connection.
     """
 
     TOPIC_STATE_DICT = {
