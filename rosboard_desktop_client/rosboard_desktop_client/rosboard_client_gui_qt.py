@@ -622,7 +622,7 @@ class ConnectionWidget(QWidget):
         "DISCONNECTED": "QLabel#StatusLabel{background-color: #FF6666;}",
     }
 
-    def __init__(self, parent):
+    def __init__(self, parent: RosboardClientGui):
         super(QWidget, self).__init__(parent)
         self.setObjectName("ConnectionWidget")
 
@@ -655,7 +655,7 @@ class ConnectionWidget(QWidget):
 
         self.setLayout(ly_widget)
 
-    def get_connection_address(self):
+    def get_connection_address(self) -> str:
         return self.address_le.text()
 
     def set_buttons_status(self, is_connected: bool):
@@ -690,7 +690,8 @@ class StatsWidget(QWidget):
     download speed.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent: RosboardClientGui):
+        print(type(parent))
         super(QWidget, self).__init__(parent)
 
         # Define the labels to store the stats. values.
@@ -705,7 +706,7 @@ class StatsWidget(QWidget):
         ly_widget.addWidget(self.download_lb, 2, 0)
         self.setLayout(ly_widget)
 
-    def update_stats_widget(self, cpu_usage, roundtrip, download):
+    def update_stats_widget(self, cpu_usage: float, roundtrip: float, download: float):
         """!
         Update the statistic widget with the CPU usage, roundtrip and download speed.
         @param cpu_usage "float" value that represent the CPU usage.
@@ -722,7 +723,7 @@ class TopicsListWidget(QWidget):
     Widget that contains the required elements to connect to websocket.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent: RosboardClientGui):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsListWidget")
         self.setMinimumWidth(300)
@@ -746,7 +747,7 @@ class TopicsListWidget(QWidget):
         ly_main.addWidget(scroll_area)
         self.setLayout(ly_main)
 
-    def add_topic(self, topic_name):
+    def add_topic(self, topic_name: str):
         """!
         Add a button to the topic list in the panel in alphabetic order.
         @param topic_name "str" name of the topic that will be linked to the button.
@@ -765,7 +766,7 @@ class TopicsListWidget(QWidget):
         self.topic_btns.insert(topic_indx + 1, bt_topic)
         self.ly_topics.insertWidget(topic_indx, bt_topic)
 
-    def add_topic_at_end(self, topic_name):
+    def add_topic_at_end(self, topic_name: str):
         """! Add a button to the at the end of the topic list.
         @param topic_name "str" name of the topic that will be linked to the button.
         """
@@ -776,7 +777,7 @@ class TopicsListWidget(QWidget):
         self.topic_btns.append(bt_topic)
         self.ly_topics.addWidget(self.topic_btns[-1])
 
-    def remove_topic(self, topic_name):
+    def remove_topic(self, topic_name: str):
         """! Remove a topic button from the list.
         @param topic_name "str" name of the topic whose button will be removed.
         """
@@ -791,7 +792,7 @@ class TopicsListWidget(QWidget):
         for tn in topic_names:
             self.remove_topic(tn)
 
-    def get_current_topics(self):
+    def get_current_topics(self) -> list:
         """!
         Return the current topics in widget.
         """
@@ -803,7 +804,7 @@ class TopicsPanelWidget(QWidget):
     Widget that contains the required elements to connect to websocket.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent: RosboardClientGui):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsPanelWidget")
         self.setMinimumWidth(300)
@@ -832,7 +833,7 @@ class TopicsPanelWidget(QWidget):
         # List with topic widgets
         self.widgets_list = []
 
-    def add_topic(self, topic_name):
+    def add_topic(self, topic_name: str):
         """!
         Add topic to panel and configure the layout.
         @param topic_name "str" name of the topic that will be added.
@@ -841,7 +842,7 @@ class TopicsPanelWidget(QWidget):
         self.widgets_list.append(topic_wg)
         self.configure_panel()
 
-    def remove_topic(self, topic_name):
+    def remove_topic(self, topic_name: str):
         """!
         Removes a topic from the panel and configure the layout.
         @param topic_name "str" name of the topic that will be removed.
@@ -860,7 +861,7 @@ class TopicsPanelWidget(QWidget):
         for tn in topic_names:
             self.remove_topic(tn)
 
-    def update_topic_stats(self, topic_stats):
+    def update_topic_stats(self, topic_stats: dict):
         """!
         Update the statistics for topics in panel.
         @param topic_stats "dict" dictionary with the topic stats. Dictionary
@@ -870,7 +871,7 @@ class TopicsPanelWidget(QWidget):
             stats = topic_stats[widget.topic_name]
             widget.update_topic_stats(stats[0], stats[1])
 
-    def update_topic_state(self, topic_state):
+    def update_topic_state(self, topic_state: dict):
         for widget in self.widgets_list:
             state = topic_state[widget.topic_name]
             widget.update_topic_state(state)
@@ -883,7 +884,7 @@ class TopicsPanelWidget(QWidget):
             )
             count += 1
 
-    def get_current_topics(self):
+    def get_current_topics(self) -> list:
         """!
         Return the current topics in widget.
         """
@@ -903,7 +904,7 @@ class TopicWidget(QWidget):
         "NO_DATA": "QWidget#TopicWidget{background-color: #B0B0B0;}",
     }
 
-    def __init__(self, parent, topic_name):
+    def __init__(self, parent: TopicsPanelWidget, topic_name: str):
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicWidget")
         self.setAttribute(Qt.WA_StyledBackground)
@@ -939,7 +940,7 @@ class TopicWidget(QWidget):
         ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
         self.setLayout(ly_widget)
 
-    def update_topic_stats(self, frequency, latency):
+    def update_topic_stats(self, frequency: float, latency: float):
         """!
         Update the topic statistics: frequency and latency.
         @param frequency "float" value.
@@ -953,7 +954,7 @@ class TopicWidget(QWidget):
         else:
             self.latency_lb.setText("N/A")
 
-    def update_topic_state(self, state):
+    def update_topic_state(self, state: str):
         """!
         Update the node element color depending on topic state.
         @param state "str" represent the received messages values for topic.
