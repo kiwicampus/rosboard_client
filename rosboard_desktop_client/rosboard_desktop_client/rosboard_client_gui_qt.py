@@ -230,6 +230,10 @@ class RosboardClientGui(QMainWindow):
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
 
+        # Start a thread to spin the node
+        th_spin = Thread(target=rclpy.spin, args=(self.node,))
+        th_spin.start()
+
         self.reset_network_attributes()
 
         # Main window configurations
