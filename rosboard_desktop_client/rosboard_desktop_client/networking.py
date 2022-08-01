@@ -252,7 +252,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
 
         # Run the reactor in a separate thread
         self._thread = threading.Thread(target=self.run_reactor)
-        # self._thread.daemon = True
+        self._thread.daemon = True
         self._thread.start()
 
         # Check if connection takes more than the timeout
