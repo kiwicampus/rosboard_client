@@ -473,9 +473,13 @@ class RosboardClientGui(QMainWindow):
                     )
                     self.roundtrip = ping_response.avg_rtt
                 except gaierror as ge:
-                    pass
+                    self.node.get_logger().error(
+                        "Can not connect to server to get rtt!"
+                    )
                 except NameLookupError as nle:
-                    pass
+                    self.node.get_logger().error(
+                        "The server address is no longer available!"
+                    )
                 except Exception as ge:
                     self.node.get_logger().error(
                         f"There was an error while getting roundtrip: {ge}"
