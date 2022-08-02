@@ -235,7 +235,15 @@ class RosboardClientGui(QMainWindow):
     # List to store the valid protocols.
     VALID_PROTOCOLS = ["ws", "wss", "http", "https", "tcp"]
 
-    def __init__(self):
+    def __init__(
+        self,
+        cpu_timer_to: float = 250,
+        rtt_timer_to: float = 1000,
+        download_timer_to: float = 250,
+        global_stats_timer_to: float = 250,
+        topic_stats_timer_to: float = 250,
+        topic_upd_timer_to: float = 500,
+    ):
         """! Main window class for the rosboard client GUI.
 
         The main window class will organize a set of widgets in which the
@@ -265,6 +273,19 @@ class RosboardClientGui(QMainWindow):
             to the server is lost and gained again.
             7. 'topic_upd_timer' (callback every 500ms): timer to update the
             available topics in the topics list widget.
+
+        @param cpu_timer_to "float" timeout value in milliseconds for the
+        'cpu_usage_timer' timer. It has a default value of 250.
+        @param rtt_timer_to "float" timeout value in milliseconds for the
+        'roundtrip_timer' timer. It has a default value of 1000.
+        @param download_timer_to "float" timeout value in milliseconds for
+        the 'download_speed_timer' timer. It has a default value of 250.
+        @param global_stats_timer_to "float" timeout value in milliseconds
+        for the 'stats_timer' timer. It has a default value of 250.
+        @param topic_stats_timer_to "float" timeout value in milliseconds for
+        the 'topic_stats_timer' timer. It has a default value of 250.
+        @param topic_upd_timer_to "float" timeout value in milliseconds for
+        the 'topic_upd_timer' timer. It has a default value of 500.
         """
         super(QMainWindow, self).__init__()
         self.setMinimumSize(650, 400)
@@ -329,18 +350,19 @@ class RosboardClientGui(QMainWindow):
         cpu_usage_timer.timeout.connect(self.update_cpu_usage)
         roundtrip_timer.timeout.connect(self.update_roundtrip)
         download_speed_timer.timeout.connect(self.update_download_speed)
-        cpu_usage_timer.start(250)
-        roundtrip_timer.start(1000)
-        download_speed_timer.start(250)
+        cpu_usage_timer.start(cpu_timer_to)
+        roundtrip_timer.start(rtt_timer_to)
+        download_speed_timer.start(download_timer_to)
 
         # Create a timer to update the stats panel
         stats_timer = QTimer(self)
         stats_timer.timeout.connect(self.update_stats)
-        stats_timer.start(250)
+        stats_timer.start(global_stats_timer_to)
 
         # Create a timer to update the topic stats
         self.topic_stats_timer = QTimer(self)
         self.topic_stats_timer.timeout.connect(self.update_topic_stats_and_state)
+        self.topic_stats_to = topic_stats_timer_to
 
         # Timer that checks the connection status to handle closures
         self.restore_timer = QTimer(self)
@@ -349,6 +371,7 @@ class RosboardClientGui(QMainWindow):
         # Timer to update the available topics
         self.topic_upd_timer = QTimer(self)
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
+        self.topic_upd_timer_to = topic_upd_timer_to
 
     def spin_node(self):
         while not self.stop_threads:
