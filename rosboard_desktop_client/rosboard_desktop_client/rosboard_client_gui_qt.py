@@ -229,8 +229,11 @@ class RosboardClientGui(QMainWindow):
     #  port, path and query from an URL.
     URL_RE = "^((?P<scheme>[^:/?#]+):(?=//))?(//)?(((?P<login>[^:]+)(?::(?P<password>[^@]+)?)?@)?(?P<host>[^@/?#:]*)(?::(?P<port>\d+)?)?)?(?P<path>[^?#]*)(\?(?P<query>[^#]*))?"
 
+    # Dictionary to map schemes to ports
+    PORTS = {"DEFAULT": 80, "http": 80, "https": 443}
+
     # List to store the valid protocols.
-    valid_protocols = ["ws", "wss", "http", "https", "tcp"]
+    VALID_PROTOCOLS = ["ws", "wss", "http", "https", "tcp"]
 
     def __init__(self):
         """! Main window class for the rosboard client GUI.
@@ -525,8 +528,19 @@ class RosboardClientGui(QMainWindow):
         @return "int" port for connection.
         """
         match = re.search(RosboardClientGui.URL_RE, address)
+        scheme = (
+            match.group("scheme")
+            if match.group("scheme") is not None
+            and match.group("scheme") in RosboardClientGui.PORTS.keys()
+            else "DEFAULT"
+        )
         host = match.group("host")
-        port = match.group("port") if match.group("port") is not None else 80
+        port = (
+            match.group("port")
+            if match.group("port") is not None
+            else RosboardClientGui.PORTS[scheme]
+        )
+        print(f"Connecting to: {host}:{port}")
         return host, port
 
     def test_connection(self, host: str, port: int) -> bool:
