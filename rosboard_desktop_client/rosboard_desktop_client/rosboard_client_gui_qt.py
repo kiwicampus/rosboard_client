@@ -1108,7 +1108,7 @@ class TopicWidget(QWidget):
         in RosboardClientGui. This slot routes the function call into the
         parent class.
         """
-        self.parent().parent().parent().parent().add_topic_to_list_remove_from_panel(
+        self.parent().parent().parent().parent().parent().parent().parent().add_topic_to_list_remove_from_panel(
             self.topic_name
         )
 
