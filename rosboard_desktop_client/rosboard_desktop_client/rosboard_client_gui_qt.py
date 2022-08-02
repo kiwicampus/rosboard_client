@@ -48,8 +48,9 @@ from rosboard_desktop_client.republishers import PublisherManager
 
 
 class TopicHandler:
-
-    def __init__(self, topic_name: str, client: RosboardClient, node: Node, alpha: float=0.1):
+    def __init__(
+        self, topic_name: str, client: RosboardClient, node: Node, alpha: float = 0.1
+    ):
         """! Class to handle the topic subscription and statistics.
 
         This class provides a mechanism to connect a topic to the rosboard
@@ -65,10 +66,17 @@ class TopicHandler:
         self.client = client
         self.topic_name = topic_name
         self.has_header = False
+
+        # Variables for period
+        self.last_period = 0.0
+        self.last_period_var = 0.0
+
+        # Variables for latency
+        self.last_latency = 0.0
+        self.last_latency_var = 0.0
+
         self.rate = 0.0
         self.alpha = alpha
-        self.last_period = 0.0
-        self.last_latency = 0.0
         self.state = "NO_DATA"
 
         # Get the topic message type and create republisher
@@ -117,16 +125,21 @@ class TopicHandler:
         is achieved, the topic handler will be in a 'NORMAL' state.
         """
         while self.running:
-            if self.t_last_msg is not None:
-                if time() - self.t_last_msg > 5.0:
+            if self.n_msgs > 1:
+                t_current = time()
+                mean = (t_current - self.t_start) / self.n_msgs
+                print(f"{self.last_period - mean} vs {self.last_period_var**0.5}")
+                if t_current - self.t_last_msg > 5.0:
                     self.state = "NO_DATA"
-                elif self.rate < 0.8 * self.avg_rate:
+                elif abs(self.last_period - mean) > 2 * (self.last_period_var**0.5):
                     self.state = "DELAY"
                 else:
                     self.state = "NORMAL"
             sleep(0.25)
 
-    def calculate_average(self, current_value: float, last_value: float) -> float:
+    def calculate_average_and_var(
+        self, current_value: float, last_value: float, last_var: float
+    ) -> Tuple[float, float]:
         """! Calculate the exponentially weighted moving average.
 
         This function calculates the exponentially weighted moving average
@@ -135,31 +148,43 @@ class TopicHandler:
         'ALPHA' constant, which might depend on the expected number of items
         of the list.
 
-        @param time_delta "float" 
+        @param current_value "float" current value.
+        @param last_value "float" last EMWA value.
         @return "float" with the average value. Return 0.0 if time_list has
         no values.
         """
         if self.n_msgs == 0:
-            return current_value
+            current_var = (1.0 - self.alpha) * (self.alpha * current_value**2)
+            return current_value, current_var
         else:
-            return self.alpha * current_value + (1.0 - self.alpha) * last_value
+            ewma = self.alpha * current_value + (1.0 - self.alpha) * last_value
+            delta = current_value - last_value
+            current_var = (1.0 - self.alpha) * (last_var + self.alpha * delta**2)
+            return ewma, current_var
 
     def topic_callback(self, msg: list):
         """! Topic callback function for incoming rosboard messages.
 
         This function processes the incoming messages in order to provide the
-        stats of the current topic handler. It adds one unit to the count of 
+        stats of the current topic handler. It adds one unit to the count of
         received messages. Then, it captures the current time, that is then used
-        to 
+        to
         """
         t_current = time()
         if self.n_msgs > 0:
             if self.has_header:
                 t_send = self.timestamp_to_secs(msg[1]["header"]["stamp"])
                 current_latency = t_current - t_send
-                self.last_latency = self.calculate_average(current_latency, self.last_latency)
+                (
+                    self.last_latency,
+                    self.last_period_var,
+                ) = self.calculate_average_and_var(
+                    current_latency, self.last_latency, self.last_period_var
+                )
             current_period = t_current - self.t_last_msg
-            self.last_period = self.calculate_average(current_period, self.last_period)
+            self.last_period, self.last_period_var = self.calculate_average_and_var(
+                current_period, self.last_period, self.last_period_var
+            )
         else:
             self.has_header = "header" in msg[1].keys()
 
@@ -759,8 +784,8 @@ class TopicsListWidget(QWidget):
         # Insert the button into widget
         bt_topic = QPushButton(topic_name)
         bt_topic.clicked.connect(
-            # Calls add_topic_to_panel in RosboardClientGui
-            partial(self.parent().parent().parent().add_topic_to_panel, topic_name)
+            # Call add_topic_to_panel in RosboardClientGui
+            partial(self.add_topic_to_panel_slot, topic_name)
         )
         self.topic_btns.insert(topic_indx + 1, bt_topic)
         self.ly_topics.insertWidget(topic_indx, bt_topic)
@@ -770,11 +795,20 @@ class TopicsListWidget(QWidget):
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(
-            partial(self.parent().parent().parent().add_topic_to_panel, topic_name)
-        )
+        bt_topic.clicked.connect(partial(self.add_topic_to_panel_slot, topic_name))
         self.topic_btns.append(bt_topic)
         self.ly_topics.addWidget(self.topic_btns[-1])
+
+    def add_topic_to_panel_slot(self, topic_name):
+        """Slot function to call parent method.
+
+        This method calls add_topic_to_panel which is defined in
+        RosboardClientGui. This slot routes the function call into the
+        parent class.
+
+        @param topic_name "str" name of the topic that will be added to panel.
+        """
+        self.parent().parent().parent().add_topic_to_panel(topic_name)
 
     def remove_topic(self, topic_name: str):
         """! Remove a topic button from the list.
@@ -897,7 +931,7 @@ class TopicsPanelWidget(QWidget):
 class TopicWidget(QWidget):
     """!
     Widget that will show the topic information. The widget includes the
-    topic name, received frequency and time delay. A close button will 
+    topic name, received frequency and time delay. A close button will
     remove the topic widget and close the handling of the connection.
     """
 
@@ -917,8 +951,9 @@ class TopicWidget(QWidget):
         bt_close = QPushButton("X")
         bt_close.clicked.connect(
             partial(
-                # Call add_topic_to_list_remove_from_panel at RosboardClientGUI instance
-                self.parent().parent().parent().parent().add_topic_to_list_remove_from_panel,
+                # Call add_topic_to_list_remove_from_panel at RosboardClientGUI instance.
+                # This chain of parent() calls is used to reach the RosboardClientGUI instance
+                ,
                 self.topic_name,
             )
         )
@@ -943,6 +978,15 @@ class TopicWidget(QWidget):
         ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
         ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
         self.setLayout(ly_widget)
+
+    def add_topic_to_list_remove_from_panel_slot(self):
+        """Slot function to call parent method.
+
+        This method calls add_topic_to_list_remove_from_panel which is defined
+        in RosboardClientGui. This slot routes the function call into the
+        parent class.
+        """
+        self.parent().parent().parent().parent().add_topic_to_list_remove_from_panel(self.topic_name)
 
     def update_topic_stats(self, frequency: float, latency: float):
         """!
