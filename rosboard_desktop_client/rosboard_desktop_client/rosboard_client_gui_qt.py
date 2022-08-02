@@ -244,6 +244,24 @@ class RosboardClientGui(QMainWindow):
         presents the available topics in the server. Finally, the 'topics
         panel' widget presents the handled topics from the server with their
         stats.
+
+        This class contains timers that handle some of the interface
+        functionalities:
+            1. 'cpu_usage_timer' (callback every 250ms): this timer retrieves
+            the CPU usage percentage.
+            2. 'roundtrip_timer' (callback every 1000ms): this timer gets the
+            roundtrip time value to the server when connected.
+            3. 'download_speed_timer' (callback every 250ms): calculates the
+            host download speed.
+            4. 'stats_timer' (callback every 250ms): updates the global
+            statistics in the interface.
+            5. 'topic_stats_timer' (callback every 250ms): updates the handled
+            topic statistics.
+            6. 'restore_timer' (callback every 5000ms): checks if the interface
+            needs to be restored. The interface is restored when the connection
+            to the server is lost and gained again.
+            7. 'topic_upd_timer' (callback every 500ms): timer to update the
+            available topics in the topics list widget.
         """
         super(QMainWindow, self).__init__()
         self.setMinimumSize(650, 400)
