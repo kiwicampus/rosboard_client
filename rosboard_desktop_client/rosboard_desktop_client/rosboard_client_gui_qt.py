@@ -280,8 +280,9 @@ class RosboardClientGui(QMainWindow):
         self.node = Node("rosboard_desktop_gui")
 
         # Start a thread to spin the node
-        th_spin = Thread(target=rclpy.spin, args=(self.node,))
-        th_spin.start()
+        self.stop_threads = False
+        self.th_spin = Thread(target=self.spin_node)
+        self.th_spin.start()
 
         self.reset_network_attributes()
 
@@ -349,12 +350,19 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer = QTimer(self)
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
 
+    def spin_node(self):
+        while not self.stop_threads:
+            rclpy.spin_once(self.node, timeout_sec=0.01)
+        self.node.destroy_node()
+        rclpy.shutdown()
+
     def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
         """! Function for handling the close interface event."""
         if self.client is not None:
             self.client.stop_reactor()
             if self.client.protocol.is_connected:
                 self.disconnect_from_server()
+        self.stop_threads = True
         super(QMainWindow, self).closeEvent(event)
 
     def resizeEvent(self, event: PyQt5.QtGui.QResizeEvent):
