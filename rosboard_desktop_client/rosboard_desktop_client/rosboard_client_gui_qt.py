@@ -49,7 +49,7 @@ from rosboard_desktop_client.republishers import PublisherManager
 
 class TopicHandler:
     def __init__(
-        self, topic_name: str, client: RosboardClient, node: Node, alpha: float = 0.1
+        self, topic_name: str, client: RosboardClient, node: Node, alpha: float = 0.1, state_sleep: float=0.25
     ):
         """! Class to handle the topic subscription and statistics.
 
@@ -78,6 +78,7 @@ class TopicHandler:
         self.rate = 0.0
         self.alpha = alpha
         self.state = "NO_DATA"
+        self.state_sleep = state_sleep
 
         # Get the topic message type and create republisher
         message_type = client.get_topic_type(topic_name)
@@ -135,7 +136,7 @@ class TopicHandler:
                     self.state = "DELAY"
                 else:
                     self.state = "NORMAL"
-            sleep(0.25)
+            sleep(self.state_sleep)
 
     def calculate_average_and_var(
         self, current_value: float, last_value: float, last_var: float
