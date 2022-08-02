@@ -49,7 +49,12 @@ from rosboard_desktop_client.republishers import PublisherManager
 
 class TopicHandler:
     def __init__(
-        self, topic_name: str, client: RosboardClient, node: Node, alpha: float = 0.1, state_sleep: float=0.25
+        self,
+        topic_name: str,
+        client: RosboardClient,
+        node: Node,
+        alpha: float = 0.1,
+        state_sleep: float = 0.25,
     ):
         """! Class to handle the topic subscription and statistics.
 
@@ -228,8 +233,8 @@ class RosboardClientGui(QMainWindow):
     valid_protocols = ["ws", "wss", "http", "https", "tcp"]
 
     def __init__(self):
-        """! Main window class for the rosboard client GUI. 
-        
+        """! Main window class for the rosboard client GUI.
+
         The main window class will organize a set of widgets in which the
         functionalities are implemented. There are four main widgets in the
         rosboard client GUI: 'network connection', 'stats', 'topics list' and
@@ -332,13 +337,13 @@ class RosboardClientGui(QMainWindow):
         super(QMainWindow, self).closeEvent(event)
 
     def resizeEvent(self, event: PyQt5.QtGui.QResizeEvent):
-        """ Update the user interface on resize."""
+        """Update the user interface on resize."""
         self.configure_topics_panel()
         super().resizeEvent(event)
 
     def configure_topics_panel(self):
         """! Configure the topics panel columns.
-        
+
         The topics panel number of columns is adjusted depending on the
         current size of the user interface. This in turn allows the interface
         to be responsive depending on its size.
@@ -611,7 +616,7 @@ class RosboardClientGui(QMainWindow):
 
     def add_topic_to_panel(self, topic_name: str):
         """! Add a topic to the topics panel widget and create its handler.
-        
+
         Calling this method will create an instance of 'TopicHandler', which
         will handle the websocket/ROS interface of the topics, and will add
         the topic to the topics panel widget.
@@ -660,10 +665,8 @@ class RosboardClientGui(QMainWindow):
 
 
 class ConnectionWidget(QWidget):
-    """!
-    Widget that contains the required elements to connect to websocket.
-    """
 
+    # Dictionary to update the connection status label.
     CONN_STATUS_DICT = {
         "RETRYING": "QLabel#StatusLabel{background-color: #FFE666;}",
         "CONNECTED": "QLabel#StatusLabel{background-color: #77CC66;}",
@@ -671,6 +674,16 @@ class ConnectionWidget(QWidget):
     }
 
     def __init__(self, parent: RosboardClientGui):
+        """! Widget to establish a connection to the server.
+
+        This class has an input line in which the server URL can be typed by
+        the user. Two buttons allow for connecting and disconnecting the user
+        interface to/from the server. Finally, a label is used to show the
+        connection status.
+
+        @param parent "RosboardClientGui" establish the parent class of the
+        widget.
+        """
         super(QWidget, self).__init__(parent)
         self.setObjectName("ConnectionWidget")
 
@@ -704,26 +717,32 @@ class ConnectionWidget(QWidget):
         self.setLayout(ly_widget)
 
     def get_connection_address(self) -> str:
+        """! Get the current text value of the connection address.
+        @return "str" value of the line edit.
+        """
         return self.address_le.text()
 
     def set_buttons_status(self, is_connected: bool):
-        """!
-        Enables or disables the connection and disconnection buttons.
+        """! Enables or disables the buttons depending on connection status.
+
+        The connect button will be enabled if the interface is not connected
+        to the server. It will be disabled otherwise. The disconnect button
+        will be enabled if the interface is connected to the server. It will
+        be disabled otherwise.
+
         @param is_connected "bool" indicate if the GUI is connected or not.
         """
         self.connect_bt.setEnabled(not is_connected)
         self.disconnect_bt.setEnabled(is_connected)
 
     def toggle_edits(self, enabled: bool):
-        """!
-        Toggle the widget line edits to allow for changes or not.
+        """! Toggle the widget line edits to allow for changes or not.
         @param enabled "bool" indicates if the line edits are enabled or not.
         """
         self.address_le.setEnabled(enabled)
 
     def set_status_label(self, status: str):
         """! Set the status label display based on parameters.
-
         @param status "str" connection status to server.
         """
         self.status_lb.setText(status)
@@ -731,14 +750,17 @@ class ConnectionWidget(QWidget):
 
 
 class StatsWidget(QWidget):
-    """!
-    Widget that contains elements to show the stats for the user.
-    The stats consist of the CPU usage represented as a percentage,
-    the round trip time to the connected socket, and the current
-    download speed.
-    """
-
     def __init__(self, parent: RosboardClientGui):
+        """! Widget to present global statistics in the user interface.
+
+        Widget that contains elements to show the stats for the user.
+        The stats consist of the CPU usage represented as a percentage,
+        the round trip time to the connected socket, and the current
+        download speed.
+
+        @param parent "RosboardClientGui" establish the parent class of the
+        widget.
+        """
         print(type(parent))
         super(QWidget, self).__init__(parent)
 
@@ -767,18 +789,22 @@ class StatsWidget(QWidget):
 
 
 class TopicsListWidget(QWidget):
-    """!
-    Widget that contains the list of available topics in the server. The
-    topics are presented in the interface as a vertical list of buttons. As
-    one of these buttons is pressed, the interface will handle the interface
-    and the topic will be published in the client side.
-    """
-
     def __init__(self, parent: RosboardClientGui):
+        """! Widget to show the available topics from the server in a list.
+
+        This widget contains the list of available topics in the server. The
+        topics are presented in the interface as a vertical list of buttons. As
+        one of these buttons is pressed, the interface will handle the interface
+        and the topic will be published in the client side.
+
+        @param parent "RosboardClientGui" establish the parent class of the
+        widget.
+        """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsListWidget")
         self.setMinimumWidth(300)
 
+        # List to store the button widgets.
         self.topic_btns = []
 
         self.ly_topics = QVBoxLayout()
@@ -799,8 +825,7 @@ class TopicsListWidget(QWidget):
         self.setLayout(ly_main)
 
     def add_topic(self, topic_name: str):
-        """!
-        Add a button to the topic list in the panel in alphabetic order.
+        """! Insert a topic to the list in alphabetic order.
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         # Add topic to list and get index
@@ -861,15 +886,18 @@ class TopicsListWidget(QWidget):
 
 
 class TopicsPanelWidget(QWidget):
-    """!
-    Widget that contains the topics widgets associated to the handled topics.
-    Handled topics are the ones that are being published in the client side.
-    Elements in this widget consists of further widgets that include the topics
-    name and statistics. This widget is only responsible of organizing how such
-    widgets are presented.
-    """
-
     def __init__(self, parent: RosboardClientGui):
+        """! Widget that contains handled topic widgets.
+
+        This widget contains the topics widgets associated to the handled topics.
+        Handled topics are the ones that are being published in the client side.
+        Elements in this widget consists of further widgets that include the topics
+        name and statistics. This widget is only responsible of organizing how such
+        widgets are presented.
+
+        @param parent "RosboardClientGui" establish the parent class of the
+        widget.
+        """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsPanelWidget")
         self.setMinimumWidth(300)
@@ -927,21 +955,24 @@ class TopicsPanelWidget(QWidget):
             self.remove_topic(tn)
 
     def update_topic_stats(self, topic_stats: dict):
-        """!
-        Update the statistics for topics in panel.
+        """! Update the statistics for topics in panel.
         @param topic_stats "dict" dictionary with the topic stats. Dictionary
-            key is topic name and value is a list with topic statistics.
+        key is topic name and value is a list with topic statistics.
         """
         for widget in self.widgets_list:
             stats = topic_stats[widget.topic_name]
             widget.update_topic_stats(stats[0], stats[1])
 
     def update_topic_state(self, topic_state: dict):
+        """! Update the topic state on the each handled widget.
+        @param topic_state "dict" dictionary with the state for each topic.
+        """
         for widget in self.widgets_list:
             state = topic_state[widget.topic_name]
             widget.update_topic_state(state)
 
     def configure_panel(self):
+        """! Adds and organizes the topics widgets."""
         count = 0
         for widget in self.widgets_list:
             self.ly_widget.addWidget(
@@ -950,19 +981,13 @@ class TopicsPanelWidget(QWidget):
             count += 1
 
     def get_current_topics(self) -> list:
-        """!
-        Return the current topics in widget.
-        """
+        """! Return the current topics in widget."""
         return [topic_wg.topic_name for topic_wg in self.widgets_list]
 
 
 class TopicWidget(QWidget):
-    """!
-    Widget that will show the topic information. The widget includes the
-    topic name, received frequency and time delay. A close button will
-    remove the topic widget and close the handling of the connection.
-    """
 
+    # Dictionary that maps the topic state to a widget background color.
     TOPIC_STATE_DICT = {
         "DELAY": "QWidget#TopicWidget{background-color: #FF6666;}",
         "NORMAL": "QWidget#TopicWidget{background-color: #77CC66;}",
@@ -970,6 +995,15 @@ class TopicWidget(QWidget):
     }
 
     def __init__(self, parent: TopicsPanelWidget, topic_name: str):
+        """! Widget to present the handled topic name and statistics.
+
+        The widget includes the topic name, received frequency and time delay.
+        A close button will remove the topic widget and close the handling of
+        the connection.
+
+        @param parent "TopicsPanelWidget"
+        @param topic_name "str"
+        """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicWidget")
         self.setAttribute(Qt.WA_StyledBackground)
@@ -977,14 +1011,7 @@ class TopicWidget(QWidget):
         self.topic_name = topic_name
 
         bt_close = QPushButton("X")
-        bt_close.clicked.connect(
-            partial(
-                # Call add_topic_to_list_remove_from_panel at RosboardClientGUI instance.
-                # This chain of parent() calls is used to reach the RosboardClientGUI instance
-                ,
-                self.topic_name,
-            )
-        )
+        bt_close.clicked.connect(self.add_topic_to_list_remove_from_panel_slot)
 
         lb_name = QLabel(self.topic_name)
         lb_name.setObjectName("TopicName")
@@ -1014,7 +1041,9 @@ class TopicWidget(QWidget):
         in RosboardClientGui. This slot routes the function call into the
         parent class.
         """
-        self.parent().parent().parent().parent().add_topic_to_list_remove_from_panel(self.topic_name)
+        self.parent().parent().parent().parent().add_topic_to_list_remove_from_panel(
+            self.topic_name
+        )
 
     def update_topic_stats(self, frequency: float, latency: float):
         """!
