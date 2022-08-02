@@ -220,12 +220,26 @@ class TopicHandler:
 
 class RosboardClientGui(QMainWindow):
 
+    # Regular expression to capture network scheme, login, password, host,
+    #  port, path and query from an URL.
     URL_RE = "^((?P<scheme>[^:/?#]+):(?=//))?(//)?(((?P<login>[^:]+)(?::(?P<password>[^@]+)?)?@)?(?P<host>[^@/?#:]*)(?::(?P<port>\d+)?)?)?(?P<path>[^?#]*)(\?(?P<query>[^#]*))?"
 
-    # List to store the valid protocols
+    # List to store the valid protocols.
     valid_protocols = ["ws", "wss", "http", "https", "tcp"]
 
     def __init__(self):
+        """! Main window class for the rosboard client GUI. 
+        
+        The main window class will organize a set of widgets in which the
+        functionalities are implemented. There are four main widgets in the
+        rosboard client GUI: 'network connection', 'stats', 'topics list' and
+        'topics panel'. The 'network connection' widget allows the user to
+        input an URL and connect to the server. The 'stats' widget is in
+        charge of presenting global statistics to the user. The 'topics list'
+        presents the available topics in the server. Finally, the 'topics
+        panel' widget presents the handled topics from the server with their
+        stats.
+        """
         super(QMainWindow, self).__init__()
         self.setMinimumSize(650, 400)
 
@@ -310,7 +324,7 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
 
     def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
-        """! Function for handling the close interface."""
+        """! Function for handling the close interface event."""
         if self.client is not None:
             self.client.stop_reactor()
             if self.client.protocol.is_connected:
@@ -318,11 +332,17 @@ class RosboardClientGui(QMainWindow):
         super(QMainWindow, self).closeEvent(event)
 
     def resizeEvent(self, event: PyQt5.QtGui.QResizeEvent):
-        """Update the user interface on resize."""
+        """ Update the user interface on resize."""
         self.configure_topics_panel()
         super().resizeEvent(event)
 
     def configure_topics_panel(self):
+        """! Configure the topics panel columns.
+        
+        The topics panel number of columns is adjusted depending on the
+        current size of the user interface. This in turn allows the interface
+        to be responsive depending on its size.
+        """
         ui_width = self.topics_panel_widget.size().width()
         if ui_width < 501:
             self.topics_panel_widget.MAX_COLS = 1
@@ -487,9 +507,7 @@ class RosboardClientGui(QMainWindow):
         return host, port
 
     def test_connection(self, host: str, port: int) -> bool:
-        """!
-        Check the websocket status and enable the connect button.
-        """
+        """! Check the websocket status and enable the connect button."""
         try:
             test_socket = socket(AF_INET, SOCK_STREAM)
             test_socket.settimeout(1.0)
@@ -592,6 +610,14 @@ class RosboardClientGui(QMainWindow):
         self.connection_widget.set_status_label("DISCONNECTED")
 
     def add_topic_to_panel(self, topic_name: str):
+        """! Add a topic to the topics panel widget and create its handler.
+        
+        Calling this method will create an instance of 'TopicHandler', which
+        will handle the websocket/ROS interface of the topics, and will add
+        the topic to the topics panel widget.
+
+        @param topic_name "str" name of the topic that will be added to panel.
+        """
         try:
             self.topic_handlers[topic_name] = TopicHandler(
                 topic_name, self.client, self.node
@@ -623,6 +649,7 @@ class RosboardClientGui(QMainWindow):
         self.topics_list_widget.add_topic(topic_name)
 
     def update_topic_stats_and_state(self):
+        """! Update the handled topic statistics and state."""
         topic_stats = {}
         topic_state = {}
         for topic in self.topic_handlers.keys():
