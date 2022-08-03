@@ -313,7 +313,7 @@ class RosboardClientGui(QMainWindow):
         # Initialize custom widgets
         self.connection_widget = ConnectionWidget(self)
         self.stats_widget = StatsWidget(self)
-        self.topics_list_widget = TopicsListWidget(self)
+        self.topics_list_widget = TopicsListWidget(self, self.add_topic_to_panel)
         self.topics_panel_widget = TopicsPanelWidget(self)
 
         # Define the top layout (connection + stats)
@@ -469,7 +469,7 @@ class RosboardClientGui(QMainWindow):
             del self.topic_handlers[topic]
 
         # Clean the interface
-        self.topics_list_widget.remove_all_topics()
+        self.topics_list_widget.clear_list()
         self.topics_panel_widget.remove_all_topics()
 
         # Configure the interface
@@ -632,7 +632,7 @@ class RosboardClientGui(QMainWindow):
                 self.topic_handlers = {}
                 self.available_topics = self.client.get_available_topics()
                 for topic in self.available_topics:
-                    self.topics_list_widget.add_topic_at_end(topic)
+                    self.topics_list_widget.add_topic(topic)
 
                 # Start the timers to update topics list, stats and restore interface
                 self.topic_stats_timer.start(250)
@@ -675,7 +675,7 @@ class RosboardClientGui(QMainWindow):
         self.reset_network_attributes()
 
         # Restore the interface to the disconnected status
-        self.topics_list_widget.remove_all_topics()
+        self.topics_list_widget.clear_list()
         self.topics_panel_widget.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.connection_widget.set_buttons_status(self.is_connected)
@@ -718,7 +718,7 @@ class RosboardClientGui(QMainWindow):
             self.topic_handlers[topic_name].destroy_subscription()
             del self.topic_handlers[topic_name]
             self.topics_panel_widget.remove_topic(topic_name)
-        self.topics_list_widget.add_topic(topic_name)
+        self.topics_list_widget.insert_topic(topic_name)
 
     def update_topic_stats_and_state(self):
         """! Update the handled topic statistics and state."""
@@ -856,100 +856,96 @@ class StatsWidget(QWidget):
 
 
 class TopicsListWidget(QWidget):
-    def __init__(self, parent: RosboardClientGui):
-        """! Widget to show the available topics from the server in a list.
+    def __init__(self, parent: RosboardClientGui, button_click_handler: callable):
+        """! Widget to show a topics list and manage its behavior.
 
-        This widget contains the list of available topics in the server. The
-        topics are presented in the interface as a vertical list of buttons. As
-        one of these buttons is pressed, the interface will handle the interface
-        and the topic will be published in the client side.
+        This class includes the logic to handle a topics list. The logic
+        allows to add and remove buttons. Buttons can be added at the end of
+        the list ('add_topic') or inserted to match an alphabetical order
+        ('insert_topic'). Removing a specific button ('') is possible as
+        clearing the whole list (). When a button is pressed, the widget will
+        route the slot into a callable object that is passed in the
+        constructor.
 
-        @param parent "RosboardClientGui" establish the parent class of the
-        widget.
+        @params parent "RosboardClientGui" set the parent class of the
+        widget to call methods.
+        @params button_click_handler "callable" get the callable function that
+        is executed when a button from the list is pressed. The callable must
+        have a parameter related to the topic name.
         """
-        super(QWidget, self).__init__(parent)
+        super(TopicsListWidget, self).__init__(parent)
         self.setObjectName("TopicsListWidget")
         self.setMinimumWidth(300)
 
-        # List to store the button widgets.
-        self.topic_btns = []
+        # Store the callable object
+        self.button_slot = button_click_handler
 
-        self.ly_topics = QVBoxLayout()
-        self.ly_topics.setAlignment(Qt.AlignTop)
+        # List to store the button objects
+        self.buttons_list = []
 
-        # Create the group of topic buttons
-        self.topics_gb = QGroupBox()
-        self.topics_gb.setObjectName("topics_gb")
-        self.topics_gb.setLayout(self.ly_topics)
-        self.topics_gb.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
+        # Create the layout to add the buttons
+        self.ly_buttons = QVBoxLayout()
+        self.ly_buttons.setAlignment(Qt.AlignTop)
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(self.topics_gb)
-        scroll_area.setWidgetResizable(True)
+        # Create the group box to handle the buttons layout
+        gb_buttons = QGroupBox()
+        gb_buttons.setObjectName("topics_gb")
+        gb_buttons.setLayout(self.ly_buttons)
+        gb_buttons.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
 
-        ly_main = QVBoxLayout(self)
-        ly_main.addWidget(scroll_area)
+        # Create the scroll area for the buttons
+        sa_buttons = QScrollArea()
+        sa_buttons.setWidget(gb_buttons)
+        sa_buttons.setWidgetResizable(True)
+
+        # Create the main layout to add the scroll area
+        ly_main = QVBoxLayout()
+        ly_main.addWidget(sa_buttons)
         self.setLayout(ly_main)
 
-    def add_topic(self, topic_name: str):
-        """! Insert a topic to the list in alphabetic order.
-        @param topic_name "str" name of the topic that will be linked to the button.
-        """
-        # Add topic to list and get index
-        current_topics = [bt.text() for bt in self.topic_btns]
-        current_topics.append(topic_name)
-        current_topics = sorted(current_topics)
-        topic_indx = current_topics.index(topic_name)
-
-        # Insert the button into widget
-        bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(
-            # Call add_topic_to_panel in RosboardClientGui
-            partial(self.add_topic_to_panel_slot, topic_name)
-        )
-        self.topic_btns.insert(topic_indx + 1, bt_topic)
-        self.ly_topics.insertWidget(topic_indx, bt_topic)
-
-    def add_topic_at_end(self, topic_name: str):
+    def add_topic(self, topic_name):
         """! Add a button to the at the end of the topic list.
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.add_topic_to_panel_slot, topic_name))
-        self.topic_btns.append(bt_topic)
-        self.ly_topics.addWidget(self.topic_btns[-1])
+        bt_topic.clicked.connect(partial(self.button_slot, topic_name))
+        self.buttons_list.append(bt_topic)
+        self.ly_buttons.addWidget(bt_topic)
 
-    def add_topic_to_panel_slot(self, topic_name):
-        """Slot function to call parent method.
-
-        This method calls add_topic_to_panel which is defined in
-        RosboardClientGui. This slot routes the function call into the
-        parent class.
-
-        @param topic_name "str" name of the topic that will be added to panel.
+    def insert_topic(self, topic_name):
+        """! Insert a topic to the list in alphabetic order.
+        @param topic_name "str" name of the topic that will be linked to the button.
         """
-        self.parent().parent().parent().add_topic_to_panel(topic_name)
+        current_topics = sorted(self.get_current_topics())
+        current_index = 0
+        for topic in current_topics:
+            if topic > topic_name:
+                button = QPushButton(topic_name)
+                button.clicked.connect(partial(self.button_slot, topic_name))
+                self.buttons_list.insert(current_index, button)
+                self.ly_buttons.insertWidget(current_index, button)
+                break
+            current_index += 1
 
-    def remove_topic(self, topic_name: str):
+    def remove_topic(self, topic_name):
         """! Remove a topic button from the list.
         @param topic_name "str" name of the topic whose button will be removed.
         """
-        for button in self.topic_btns:
+        for button in self.buttons_list:
             if button.text() == topic_name:
-                self.topic_btns.remove(button)
+                self.buttons_list.remove(button)
                 button.deleteLater()
+                break
 
-    def remove_all_topics(self):
-        """! Remove all topics from widget."""
-        topic_names = [btn.text() for btn in self.topic_btns]
-        for tn in topic_names:
-            self.remove_topic(tn)
+    def clear_list(self):
+        """! Remove every button present in the list."""
+        for button in self.buttons_list:
+            self.buttons_list.remove(button)
+            button.deleteLater()
 
     def get_current_topics(self) -> list:
-        """!
-        Return the current topics in widget.
-        """
-        return [btn.text() for btn in self.topic_btns]
+        """! Return the current topic names in the widget."""
+        return [bt.text() for bt in self.buttons_list]
 
 
 class TopicsPanelWidget(QWidget):
