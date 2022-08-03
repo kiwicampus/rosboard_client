@@ -100,6 +100,10 @@ QWidget#TopicsListWidget QPushButton:pressed {
     background-color: #2885E2;
 }
 
+QWidget#TopicWidget {
+    background-color: #1863AD;
+}
+
 QWidget#TopicWidget QLabel {
     color: #000000;
 }
