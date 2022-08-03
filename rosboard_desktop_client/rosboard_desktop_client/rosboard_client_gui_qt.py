@@ -123,7 +123,7 @@ class TopicHandler:
         """! Destroy the subscription to the topic."""
         self.node.get_logger().info(f"Closing connection for {self.topic_name}")
         self.client.destroy_socket_subscription(self.topic_name)
-        self.node.destroy_publisher(self.topic_name)
+        self.node.destroy_publisher(self.republisher.publisher)
         self.running = False
 
     def define_node_state(self):
