@@ -41,6 +41,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QMessageBox,
     QSplitter,
+    QCheckBox,
 )
 
 from rosboard_desktop_client.streamers import GenericStreamer
@@ -122,6 +123,7 @@ class TopicHandler:
         """! Destroy the subscription to the topic."""
         self.node.get_logger().info(f"Closing connection for {self.topic_name}")
         self.client.destroy_socket_subscription(self.topic_name)
+        self.node.destroy_publisher(self.topic_name)
         self.running = False
 
     def define_node_state(self):
@@ -331,25 +333,38 @@ class RosboardClientGui(QMainWindow):
 
         # Define the top layout (connection + stats)
         ly_top = QHBoxLayout()
-        ly_top.addWidget(self.connection_widget, 7)
-        ly_top.addWidget(self.stats_widget, 3)
+        ly_top.addWidget(self.connection_widget, 7, Qt.AlignTop)
+        ly_top.addWidget(self.stats_widget, 3, Qt.AlignTop)
 
         # Define the top splitter (topics list + topic stats)
-        splitter_top = QSplitter(self)
-        splitter_top.splitterMoved.connect(self.configure_topics_panel)
-        splitter_top.addWidget(self.server_topics_list_wg)
-        splitter_top.addWidget(self.server_topics_panel_wg)
+        self.splitter_top = QSplitter(self)
+        self.splitter_top.splitterMoved.connect(self.configure_topics_panel)
+        self.splitter_top.addWidget(self.server_topics_list_wg)
+        self.splitter_top.addWidget(self.server_topics_panel_wg)
 
         # Define the bottom splitter
-        splitter_bottom = QSplitter(self)
-        splitter_bottom.addWidget(self.client_topics_list_wg)
-        splitter_bottom.addWidget(self.client_topics_panel_wg)
+        self.splitter_bottom = QSplitter(self)
+        self.splitter_bottom.addWidget(self.client_topics_list_wg)
+        self.splitter_bottom.addWidget(self.client_topics_panel_wg)
+
+        # Create checkboxes
+        self.top_cb = QCheckBox("Topics streaming from server")
+        self.top_cb.setChecked(True)
+        self.top_cb.stateChanged.connect(self.toggle_top)
+        self.bottom_cb = QCheckBox("Topics streaming to server")
+        self.bottom_cb.setChecked(False)
+        self.bottom_cb.stateChanged.connect(self.toggle_bottom)
 
         # Define the main layout for window
         ly_main = QVBoxLayout()
         ly_main.addLayout(ly_top, stretch=1)
-        ly_main.addWidget(splitter_top, stretch=10)
-        ly_main.addWidget(splitter_bottom, stretch=10)
+        ly_main.addWidget(self.top_cb)
+        ly_main.addWidget(self.splitter_top, stretch=10)
+        ly_main.addWidget(self.bottom_cb)
+        ly_main.addWidget(self.splitter_bottom, stretch=10)
+
+        # Configure the bottom splitter to be hidden on default
+        self.splitter_bottom.hide()
 
         # Define the central widget and set the layout
         wg_main = QWidget(self)
@@ -411,6 +426,18 @@ class RosboardClientGui(QMainWindow):
         """Update the user interface on resize."""
         self.configure_topics_panel()
         super().resizeEvent(event)
+
+    def toggle_top(self):
+        if self.top_cb.isChecked():
+            self.splitter_top.show()
+        else:
+            self.splitter_top.hide()
+
+    def toggle_bottom(self):
+        if self.bottom_cb.isChecked():
+            self.splitter_bottom.show()
+        else:
+            self.splitter_bottom.hide()
 
     def configure_topics_panel(self):
         """! Configure the topics panel columns.
@@ -563,6 +590,21 @@ class RosboardClientGui(QMainWindow):
             client_current_topics = [
                 topic[0] for topic in self.node.get_topic_names_and_types()
             ]
+
+            # Get the topics streamed from server
+            topics_from_server = self.server_topics_panel_wg.get_current_topics()
+
+            # Get the topics streamed to server
+            topics_to_server = self.client_topics_panel_wg.get_current_topics()
+
+            # Mutually remove those topics
+            for topic in topics_from_server:
+                if topic in client_current_topics:
+                    client_current_topics.remove(topic)
+
+            for topic in topics_to_server:
+                if topic in current_topics:
+                    current_topics.remove(topic)
 
             # Remove topics from topic list
             list_topics = self.server_topics_list_wg.get_current_topics()
