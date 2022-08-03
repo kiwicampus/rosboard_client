@@ -134,7 +134,6 @@ class TopicHandler:
             if self.n_msgs > 1:
                 t_current = time()
                 mean = (t_current - self.t_start) / self.n_msgs
-                print(f"{self.last_period - mean} vs {self.last_period_var**0.5}")
                 if t_current - self.t_last_msg > 5.0:
                     self.state = "NO_DATA"
                 elif abs(self.last_period - mean) > 2 * (self.last_period_var**0.5):
@@ -828,7 +827,6 @@ class StatsWidget(QWidget):
         @param parent "RosboardClientGui" establish the parent class of the
         widget.
         """
-        print(type(parent))
         super(QWidget, self).__init__(parent)
 
         # Define the labels to store the stats. values.
