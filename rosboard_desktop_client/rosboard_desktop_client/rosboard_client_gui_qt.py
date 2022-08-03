@@ -314,7 +314,9 @@ class RosboardClientGui(QMainWindow):
         self.connection_widget = ConnectionWidget(self)
         self.stats_widget = StatsWidget(self)
         self.topics_list_widget = TopicsListWidget(self, self.add_topic_to_panel)
-        self.topics_panel_widget = TopicsPanelWidget(self)
+        self.topics_panel_widget = TopicsPanelWidget(
+            self, ExtendedTopicWidget, self.add_topic_to_list_remove_from_panel
+        )
 
         # Define the top layout (connection + stats)
         ly_top = QHBoxLayout()
@@ -701,6 +703,7 @@ class RosboardClientGui(QMainWindow):
                 "Can not load message!", "Can not load topic message type!"
             )
         except Exception as e:
+            print(e)
             self.node.get_logger().warning(
                 "Attempted to subscribe to unavailable topic!"
             )
@@ -940,16 +943,87 @@ class TopicsListWidget(QWidget):
     def clear_list(self):
         """! Remove every button present in the list."""
         for button in self.buttons_list:
-            self.buttons_list.remove(button)
             button.deleteLater()
+        self.buttons_list = []
 
     def get_current_topics(self) -> list:
         """! Return the current topic names in the widget."""
         return [bt.text() for bt in self.buttons_list]
 
 
+class TopicWidget(QWidget):
+    def __init__(self, parent, topic_name: str, close_slot: callable):
+        """!"""
+        super(QWidget, self).__init__(parent)
+        self.setObjectName("TopicWidget")
+        self.setAttribute(Qt.WA_StyledBackground)
+
+        # Store the topic name as class attribute
+        self.topic_name = topic_name
+
+        # Add the close button and connect its slot to parameter
+        bt_close = QPushButton("x")
+        bt_close.clicked.connect(partial(close_slot, self.topic_name))
+
+        lb_name = QLabel(self.topic_name)
+        lb_name.setObjectName("TopicName")
+
+        ly_top = QHBoxLayout()
+        ly_top.setSpacing(5)
+        ly_top.setContentsMargins(0, 0, 0, 0)
+        ly_top.addWidget(lb_name, stretch=100)
+        ly_top.addWidget(bt_close, stretch=1, alignment=Qt.AlignRight)
+
+        self.ly_widget = QGridLayout()
+        self.ly_widget.setSpacing(0)
+        self.ly_widget.addLayout(ly_top, 0, 0, 1, 2)
+        self.setLayout(self.ly_widget)
+
+
+class ExtendedTopicWidget(TopicWidget):
+
+    # Dictionary that maps the topic state to a widget background color.
+    TOPIC_STATE_DICT = {
+        "DELAY": "QWidget#TopicWidget{background-color: #FF6666;}",
+        "NORMAL": "QWidget#TopicWidget{background-color: #77CC66;}",
+        "NO_DATA": "QWidget#TopicWidget{background-color: #B0B0B0;}",
+    }
+
+    def __init__(self, parent, topic_name: str, close_slot: callable):
+        """!"""
+        super(ExtendedTopicWidget, self).__init__(parent, topic_name, close_slot)
+
+        self.freq_lb = QLabel("XXX.XX")
+        self.latency_lb = QLabel("XXX.XX")
+
+        self.ly_widget.addWidget(QLabel("Freq. [Hz]:"), 1, 0)
+        self.ly_widget.addWidget(QLabel("DT [ms]:"), 2, 0)
+        self.ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
+        self.ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
+
+    def update_topic_stats(self, frequency: float, latency: float):
+        """! Update the topic statistics: frequency and latency.
+        @param frequency "float" value.
+        @param latency "float" value. Might be 'None' to indicate latency is not present.
+        latency calculations or not.
+        """
+        has_latency = latency is not None
+        self.freq_lb.setText(f"{frequency:3.2f}")
+        if has_latency:
+            self.latency_lb.setText(f"{latency * 1000:3.2f}")
+        else:
+            self.latency_lb.setText("N/A")
+
+    def update_topic_state(self, state: str):
+        """!
+        Update the node element color depending on topic state.
+        @param state "str" represent the received messages values for topic.
+        """
+        self.setStyleSheet(ExtendedTopicWidget.TOPIC_STATE_DICT[state])
+
+
 class TopicsPanelWidget(QWidget):
-    def __init__(self, parent: RosboardClientGui):
+    def __init__(self, parent: RosboardClientGui, widget, close_slot: callable):
         """! Widget that contains handled topic widgets.
 
         This widget contains the topics widgets associated to the handled topics.
@@ -960,10 +1034,19 @@ class TopicsPanelWidget(QWidget):
 
         @param parent "RosboardClientGui" establish the parent class of the
         widget.
+        @param widget "QWidget" widget that will be added to the panel. The
+        widget must have two parameters fields: a string related to the
+        topics name and a callable that is called when the topic is closed.
+        @Param close_slot "callable" function that is called when the widget
+        is closed.
         """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsPanelWidget")
         self.setMinimumWidth(300)
+
+        # Store the passed parameters
+        self.widget_class = widget
+        self.close_slot = close_slot
 
         # Define attributes for max. columns
         self.MAX_COLS = 4
@@ -990,17 +1073,17 @@ class TopicsPanelWidget(QWidget):
         self.widgets_list = []
 
     def add_topic(self, topic_name: str):
-        """!
-        Add topic to panel and configure the layout.
+        """! Add topic to panel and configure the layout.
         @param topic_name "str" name of the topic that will be added.
         """
-        topic_wg = TopicWidget(self, topic_name)
-        self.widgets_list.append(topic_wg)
+        topic_widget = self.widget_class(
+            self, topic_name=topic_name, close_slot=self.close_slot
+        )
+        self.widgets_list.append(topic_widget)
         self.configure_panel()
 
     def remove_topic(self, topic_name: str):
-        """!
-        Removes a topic from the panel and configure the layout.
+        """! Remove a topic from the panel and configure the layout.
         @param topic_name "str" name of the topic that will be removed.
         """
         for topic_wg in self.widgets_list:
@@ -1046,88 +1129,6 @@ class TopicsPanelWidget(QWidget):
     def get_current_topics(self) -> list:
         """! Return the current topics in widget."""
         return [topic_wg.topic_name for topic_wg in self.widgets_list]
-
-
-class TopicWidget(QWidget):
-
-    # Dictionary that maps the topic state to a widget background color.
-    TOPIC_STATE_DICT = {
-        "DELAY": "QWidget#TopicWidget{background-color: #FF6666;}",
-        "NORMAL": "QWidget#TopicWidget{background-color: #77CC66;}",
-        "NO_DATA": "QWidget#TopicWidget{background-color: #B0B0B0;}",
-    }
-
-    def __init__(self, parent: TopicsPanelWidget, topic_name: str):
-        """! Widget to present the handled topic name and statistics.
-
-        The widget includes the topic name, received frequency and time delay.
-        A close button will remove the topic widget and close the handling of
-        the connection.
-
-        @param parent "TopicsPanelWidget"
-        @param topic_name "str"
-        """
-        super(QWidget, self).__init__(parent)
-        self.setObjectName("TopicWidget")
-        self.setAttribute(Qt.WA_StyledBackground)
-
-        self.topic_name = topic_name
-
-        bt_close = QPushButton("X")
-        bt_close.clicked.connect(self.add_topic_to_list_remove_from_panel_slot)
-
-        lb_name = QLabel(self.topic_name)
-        lb_name.setObjectName("TopicName")
-
-        ly_top = QHBoxLayout()
-        ly_top.setSpacing(5)
-        ly_top.setContentsMargins(0, 0, 0, 0)
-        ly_top.addWidget(lb_name, stretch=100)
-        ly_top.addWidget(bt_close, stretch=1, alignment=Qt.AlignRight)
-
-        self.freq_lb = QLabel("XXX.XX")
-        self.latency_lb = QLabel("XXX.XX")
-
-        ly_widget = QGridLayout()
-        ly_widget.setSpacing(0)
-        ly_widget.addLayout(ly_top, 0, 0, 1, 2)
-        ly_widget.addWidget(QLabel("Freq. [Hz]:"), 1, 0)
-        ly_widget.addWidget(QLabel("DT [ms]:"), 2, 0)
-        ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
-        ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
-        self.setLayout(ly_widget)
-
-    def add_topic_to_list_remove_from_panel_slot(self):
-        """Slot function to call parent method.
-
-        This method calls add_topic_to_list_remove_from_panel which is defined
-        in RosboardClientGui. This slot routes the function call into the
-        parent class.
-        """
-        self.parent().parent().parent().parent().parent().parent().parent().add_topic_to_list_remove_from_panel(
-            self.topic_name
-        )
-
-    def update_topic_stats(self, frequency: float, latency: float):
-        """!
-        Update the topic statistics: frequency and latency.
-        @param frequency "float" value.
-        @param latency "float" value. Might be 'None' to indicate latency is not present.
-        latency calculations or not.
-        """
-        has_latency = latency is not None
-        self.freq_lb.setText(f"{frequency:3.2f}")
-        if has_latency:
-            self.latency_lb.setText(f"{latency * 1000:3.2f}")
-        else:
-            self.latency_lb.setText("N/A")
-
-    def update_topic_state(self, state: str):
-        """!
-        Update the node element color depending on topic state.
-        @param state "str" represent the received messages values for topic.
-        """
-        self.setStyleSheet(TopicWidget.TOPIC_STATE_DICT[state])
 
 
 def main():
