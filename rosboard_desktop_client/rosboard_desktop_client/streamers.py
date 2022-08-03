@@ -45,6 +45,24 @@ class GenericStreamer:
         self.create_subscription(topic_name, topic_type)
         self.logger.info(f"Subscription to topic {topic_name} created successfully")
 
+    def destroy_subscription(self):
+        """! Destroy the subscription to the topic if it exists. If the
+        subscription does not exists and is attempted to be destroyed, a
+        warning message will be presented.
+
+        Raises:
+            Exception: in case that the subscription exists and can not be destroyed.
+        """
+        if self.subscriber is not None:
+            if not self.parent_node.destroy_subscription(self.subscriber):
+                raise Exception(
+                    f"Could not destroy subscription to {self.topic_name} topic!"
+                )
+        else:
+            self.parent_node.get_logger().warn(
+                f"Destroying inexistent subscription to {self.topic_name} topic!"
+            )
+
     def create_subscription(self, topic_name: str, topic_type: str = None) -> None:
         """!
         Function to create a subscription to a local ROS topic. If topic type is not provided
