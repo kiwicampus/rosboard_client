@@ -944,15 +944,21 @@ class TopicsListWidget(QWidget):
         """! Insert a topic to the list in alphabetic order.
         @param topic_name "str" name of the topic that will be linked to the button.
         """
+        # Create the button
+        button = QPushButton(topic_name)
+        button.clicked.connect(partial(self.button_slot, topic_name))
+
+        # Logic to insert the button in the right place
         current_topics = sorted(self.get_current_topics())
         current_index = 0
         for topic in current_topics:
             if topic > topic_name:
-                button = QPushButton(topic_name)
-                button.clicked.connect(partial(self.button_slot, topic_name))
                 self.buttons_list.insert(current_index, button)
                 self.ly_buttons.insertWidget(current_index, button)
                 break
+            if current_index == len(current_topics) - 1:
+                self.buttons_list.append(button)
+                self.ly_buttons.addWidget(button)
             current_index += 1
 
     def remove_topic(self, topic_name):
