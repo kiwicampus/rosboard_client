@@ -47,6 +47,24 @@ QPushButton:disabled {
     background-color: #E69F73;
 }
 
+QCheckBox {
+    background-color: transparent;
+    color: #FFFFFF;
+}
+
+QCheckBox:checked {
+    color: #FFFFFF;
+}
+
+QCheckBox::indicator {
+    border: 1px solid #FFFFFF;
+    background-color: transparent;
+}
+
+QCheckBox::indicator:checked {
+    border: 1px solid #FFFFFF;
+    background-color: #77CC66;
+}
 
 /* Scroll bars */
 QScrollBar:vertical,
