@@ -1,0 +1,120 @@
+QMainWindow {
+    background-color: #212121;
+}
+
+QWidget {
+    color: #FFFFFF;
+}
+
+QLineEdit {
+    color: #000000;
+    border-radius: 0;
+    margin: 0 5px;
+    padding: 5px;
+    background-color: #D6D6D6;
+}
+
+QLineEdit:disabled {
+    color: #D6D6D6;
+    background-color: #303030;
+}
+
+QPushButton {
+    padding: 5px 0;
+    margin: 5px;
+    border-radius: 0;
+    color: #000000;
+    background-color: #E66617;
+
+    border-color: #000000;
+    border-width: 3px;
+    border-style: none inset inset none;
+}
+
+QPushButton:pressed {
+    border-color: rgba(0, 0, 0, 0);
+    background-color: #E69F73;
+}
+
+QMessageBox {
+    color: #FFFFFF;
+    background-color: #303030;
+}
+
+QPushButton:disabled {
+    border-width: 0;
+    border-style: none;
+    background-color: #E69F73;
+}
+
+
+/* Scroll bars */
+QScrollBar:vertical,
+QScrollBar:horizontal {
+    border: none;
+    background: #303030;
+}
+
+QScrollBar::handle:vertical,
+QScrollBar::handle:horizontal {
+    border: 1px solid #212121;
+    background-color: #424242;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::add-line:horizontal {
+    border: 1px solid #212121;
+}
+
+QScrollBar::sub-line:vertical,
+QScrollBar::sub-line:horizontal {
+    border: 1px solid #212121;
+}
+
+/* Widget specific configurations */
+QWidget#ConnectionWidget QLabel {
+    padding: 5px 20px;
+}
+
+QLabel#StatusLabel {
+    color: black;
+}
+
+QWidget#TopicsListWidget>QScrollArea,
+QWidget#TopicsPanelWidget>QScrollArea {
+    background-color: #303030;
+}
+
+QWidget#TopicsListWidget QPushButton {
+    color: #FFFFFF;
+    background-color: #1863AD;
+}
+
+QWidget#TopicsListWidget QPushButton {
+    color: #FFFFFF;
+    background-color: #1863AD;
+}
+
+QWidget#TopicsListWidget QPushButton:pressed {
+    border-color: rgba(0, 0, 0, 0);
+    background-color: #2885E2;
+}
+
+QWidget#TopicWidget QLabel {
+    color: #000000;
+}
+
+QWidget#TopicWidget QLabel#TopicName {
+    font-size: 15px;
+}
+
+QWidget#TopicWidget QPushButton {
+    padding: 5px;
+    margin: 3px 0;
+    border-width: 2px;
+    background-color: #D92B2B;
+}
+
+QWidget#TopicWidget QPushButton:pressed {
+    background-color: #E05252;
+}

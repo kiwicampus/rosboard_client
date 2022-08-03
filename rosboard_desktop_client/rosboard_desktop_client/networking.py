@@ -15,7 +15,9 @@ import threading
 import logging
 
 from twisted.internet import reactor
-
+from twisted.internet.error import ReactorNotRunning
+from twisted.internet.error import ReactorAlreadyRunning
+from twisted.internet.protocol import ReconnectingClientFactory
 
 from autobahn.twisted.websocket import (
     WebSocketClientFactory,
@@ -146,12 +148,15 @@ class RosboardClientProtocol(WebSocketClientProtocol):
     """! Class specifying the rosboard client websocket protocol.
     Inherits from the WebSocketClientProtocol from twisted
     """
+    # Define a flag to indicate the protocol status
+    is_connected = False
 
     def onConnect(self, response) -> None:
         """!
         Function run when the websocket is successfully connected
         @param response the connection response
         """
+        RosboardClientProtocol.is_connected = True
         self.factory.logger.info(f"Server connected: {response.peer}")
 
     def onOpen(self) -> None:
@@ -159,6 +164,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         Function run when the connection is open. This sets
         the protocol object in the factory using this class
         """
+        RosboardClientProtocol.is_connected = True
         self.factory.logger.info(f"Communication opened")
         self.factory.ready(self)
 
@@ -166,6 +172,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         """!
         Function run when the connection is closed
         """
+        RosboardClientProtocol.is_connected = False
         self.factory.logger.warning(
             f"Communication closed. reason: {reason} was clean: {wasClean}, code: {code}"
         )
@@ -186,7 +193,9 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         # In case the information received contains a ros message
         if data[0] == WebsocketV1Transport.MSG_MSG:
             data = RosboardDecoder.decode_binary_fields(data)
-            self.factory.socket_subscriptions[data[1]["_topic_name"]](data)
+            topic_name = data[1]["_topic_name"]
+            if topic_name in self.factory.socket_subscriptions:
+                self.factory.socket_subscriptions[topic_name](data)
             # print(f"got message on topic {data[1]}")
         # in case the information received contains the list of available topics
         if data[0] == WebsocketV1Transport.MSG_TOPICS:
@@ -206,8 +215,12 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         )
 
 
-class RosboardClient(WebSocketClientFactory):
+class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
+    
     protocol = RosboardClientProtocol
+
+    # Specify the max time between connection attempts on reconnection
+    maxDelay = 2.0
 
     def __init__(self, host: str, connection_timeout: float):
         """! Class containing the socket client to connect to the rosboard server
@@ -219,7 +232,7 @@ class RosboardClient(WebSocketClientFactory):
             Exception: In case the server did not send the available topic within the timeout
         """
         self.logger = logging.getLogger("rosboard_client")
-
+        self.is_connected = False
         self.socket_subscriptions = {}
         self.available_topics = {}
 
@@ -233,12 +246,12 @@ class RosboardClient(WebSocketClientFactory):
             socket_url = "ws://" + host + "/rosboard/v1"
         WebSocketClientFactory.__init__(self, url=socket_url)
         self.logger.info(f"connecting to {socket_url}")
-        self.connector = connectWS(self)
+        self.connector = connectWS(self, connection_timeout)
         # protocol object. Set when the socket is ready
         self._proto = None
 
         # Run the reactor in a separate thread
-        self._thread = threading.Thread(target=reactor.run, args=(False,))
+        self._thread = threading.Thread(target=self.run_reactor)
         self._thread.daemon = True
         self._thread.start()
 
@@ -246,6 +259,7 @@ class RosboardClient(WebSocketClientFactory):
         connection_request_time = time.time()
         while self._proto is None:
             time.sleep(0.05)
+            self.is_connected = True
             if time.time() - connection_request_time > connection_timeout:
                 self.logger.error(f"Connection attempt to {socket_url} timed out")
                 raise Exception("Connection timed out")
@@ -260,6 +274,20 @@ class RosboardClient(WebSocketClientFactory):
                 raise Exception("Available topics not received")
 
         self.logger.info("available topics advertised by server")
+
+    def run_reactor(self):
+        """! Function to start the reactor. Handles if the reactor is already running."""
+        try:
+            reactor.run(False)
+        except ReactorAlreadyRunning as e:
+            self.logger.warning("Reactor not started as its already running.")
+
+    def stop_reactor(self):
+        """! Function to stop the reactor. Handles the error if the reactor is not running. """
+        try:
+            reactor.stop()
+        except ReactorNotRunning as e:
+            self.logger.warning("Reactor not stopped as it was not running.")
 
     def create_socket_subscription(self, msg_type: str, topic: str, callback) -> None:
         """! Function to subscribe to a topic available in the rosboard server
@@ -318,6 +346,7 @@ class RosboardClient(WebSocketClientFactory):
         to the server
         @param proto (WebSocketClientFactory) the protocol object
         """
+        ReconnectingClientFactory.resetDelay(self)
         self._proto = proto
 
     def set_available_topics(self, topics: dict) -> None:
@@ -359,17 +388,15 @@ class RosboardClient(WebSocketClientFactory):
     def clientConnectionLost(self, connector, reason):
         """!
         Function executed when the connection to the server is lost
-        Raises:
-            Exception: Always raises an exception, the connection with the server should not be lost
         """
+        self.is_connected = False
         self.logger.error(f"Lost connection with {self.url}, reason: {reason}")
-        raise Exception("Connection Lost")
+        ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
     def clientConnectionFailed(self, connector, reason):
         """!
         Function executed when the client cannot establish a connection with the server
-        Raises:
-            Exception: Always raises an exception. Connection should not fail
         """
+        self.is_connected = False
         self.logger.error(f"Failed to connect to {self.url}, reason: {reason}")
-        raise Exception("Unable to connect")
+        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
