@@ -316,8 +316,10 @@ class RosboardClientGui(QMainWindow):
         # Initialize custom widgets
         self.connection_widget = ConnectionWidget(self)
         self.stats_widget = StatsWidget(self)
-        self.topics_list_widget = TopicsListWidget(self)
-        self.topics_panel_widget = TopicsPanelWidget(self)
+        self.topics_list_widget = TopicsListWidget(self, self.add_topic_to_panel)
+        self.topics_panel_widget = TopicsPanelWidget(
+            self, self.add_topic_to_list_remove_from_panel
+        )
 
         # Define the top layout (connection + stats)
         ly_top = QHBoxLayout()
@@ -858,7 +860,7 @@ class StatsWidget(QWidget):
 
 
 class TopicsListWidget(QWidget):
-    def __init__(self, parent: RosboardClientGui):
+    def __init__(self, parent: RosboardClientGui, click_slot: callable):
         """! Widget to show the available topics from the server in a list.
 
         This widget contains the list of available topics in the server. The
@@ -868,10 +870,15 @@ class TopicsListWidget(QWidget):
 
         @param parent "RosboardClientGui" establish the parent class of the
         widget.
+        @param click_slot "callable" function that is called when an element
+        from the list is clicked.
         """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsListWidget")
         self.setMinimumWidth(300)
+
+        # Store the clicked slot
+        self.click_slot = click_slot
 
         # List to store the button widgets.
         self.topic_btns = []
@@ -907,7 +914,7 @@ class TopicsListWidget(QWidget):
         bt_topic = QPushButton(topic_name)
         bt_topic.clicked.connect(
             # Call add_topic_to_panel in RosboardClientGui
-            partial(self.add_topic_to_panel_slot, topic_name)
+            partial(self.click_slot, topic_name)
         )
         self.topic_btns.insert(topic_indx + 1, bt_topic)
         self.ly_topics.insertWidget(topic_indx, bt_topic)
@@ -917,20 +924,9 @@ class TopicsListWidget(QWidget):
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.add_topic_to_panel_slot, topic_name))
+        bt_topic.clicked.connect(partial(self.click_slot, topic_name))
         self.topic_btns.append(bt_topic)
         self.ly_topics.addWidget(self.topic_btns[-1])
-
-    def add_topic_to_panel_slot(self, topic_name):
-        """Slot function to call parent method.
-
-        This method calls add_topic_to_panel which is defined in
-        RosboardClientGui. This slot routes the function call into the
-        parent class.
-
-        @param topic_name "str" name of the topic that will be added to panel.
-        """
-        self.parent().parent().parent().add_topic_to_panel(topic_name)
 
     def remove_topic(self, topic_name: str):
         """! Remove a topic button from the list.
@@ -955,7 +951,7 @@ class TopicsListWidget(QWidget):
 
 
 class TopicsPanelWidget(QWidget):
-    def __init__(self, parent: RosboardClientGui):
+    def __init__(self, parent: RosboardClientGui, close_slot: callable):
         """! Widget that contains handled topic widgets.
 
         This widget contains the topics widgets associated to the handled topics.
@@ -966,10 +962,15 @@ class TopicsPanelWidget(QWidget):
 
         @param parent "RosboardClientGui" establish the parent class of the
         widget.
+        @param close_slot "callable" function that is called from the panel
+        widgets when their close button is pressed.
         """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsPanelWidget")
         self.setMinimumWidth(300)
+
+        # Store the close slot function
+        self.close_slot = close_slot
 
         # Define attributes for max. columns
         self.MAX_COLS = 4
@@ -1000,7 +1001,7 @@ class TopicsPanelWidget(QWidget):
         Add topic to panel and configure the layout.
         @param topic_name "str" name of the topic that will be added.
         """
-        topic_wg = TopicWidget(self, topic_name)
+        topic_wg = TopicWidget(self, topic_name, self.close_slot)
         self.widgets_list.append(topic_wg)
         self.configure_panel()
 
@@ -1063,15 +1064,19 @@ class TopicWidget(QWidget):
         "NO_DATA": "QWidget#TopicWidget{background-color: #B0B0B0;}",
     }
 
-    def __init__(self, parent: TopicsPanelWidget, topic_name: str):
+    def __init__(
+        self, parent: TopicsPanelWidget, topic_name: str, close_slot: callable
+    ):
         """! Widget to present the handled topic name and statistics.
 
         The widget includes the topic name, received frequency and time delay.
         A close button will remove the topic widget and close the handling of
         the connection.
 
-        @param parent "TopicsPanelWidget"
-        @param topic_name "str"
+        @param parent "TopicsPanelWidget" parent widget of this widget.
+        @param topic_name "str" name of the topic this widget is associated to.
+        @param close_slot "callable" slot function that is called when the close
+        button is clicked.
         """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicWidget")
@@ -1080,7 +1085,7 @@ class TopicWidget(QWidget):
         self.topic_name = topic_name
 
         bt_close = QPushButton("X")
-        bt_close.clicked.connect(self.add_topic_to_list_remove_from_panel_slot)
+        bt_close.clicked.connect(partial(close_slot, self.topic_name))
 
         lb_name = QLabel(self.topic_name)
         lb_name.setObjectName("TopicName")
@@ -1102,17 +1107,6 @@ class TopicWidget(QWidget):
         ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
         ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
         self.setLayout(ly_widget)
-
-    def add_topic_to_list_remove_from_panel_slot(self):
-        """Slot function to call parent method.
-
-        This method calls add_topic_to_list_remove_from_panel which is defined
-        in RosboardClientGui. This slot routes the function call into the
-        parent class.
-        """
-        self.parent().parent().parent().parent().parent().parent().parent().add_topic_to_list_remove_from_panel(
-            self.topic_name
-        )
 
     def update_topic_stats(self, frequency: float, latency: float):
         """!
