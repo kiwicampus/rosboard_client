@@ -313,9 +313,13 @@ class RosboardClientGui(QMainWindow):
         # Initialize custom widgets
         self.connection_widget = ConnectionWidget(self)
         self.stats_widget = StatsWidget(self)
-        self.topics_list_widget = TopicsListWidget(self, self.add_topic_to_panel)
-        self.topics_panel_widget = TopicsPanelWidget(
-            self, ExtendedTopicWidget, self.add_topic_to_list_remove_from_panel
+        self.server_topics_list_wg = TopicsListWidget(self, self.add_topic_to_panel)
+        self.server_topics_panel_wg = TopicsPanelWidget(
+            self, ExtendedTopicWidget, self.move_from_server_panel_to_list
+        )
+        self.client_topics_list_wg = TopicsListWidget(self, self.add_client_to_panel)
+        self.client_topics_panel_wg = TopicsPanelWidget(
+            self, TopicWidget, self.move_from_client_panel_to_list
         )
 
         # Define the top layout (connection + stats)
@@ -323,15 +327,21 @@ class RosboardClientGui(QMainWindow):
         ly_top.addWidget(self.connection_widget, 7)
         ly_top.addWidget(self.stats_widget, 3)
 
-        # Define the bottom layout (topics list + topic stats)
+        # Define the top splitter (topics list + topic stats)
+        splitter_top = QSplitter(self)
+        splitter_top.splitterMoved.connect(self.configure_topics_panel)
+        splitter_top.addWidget(self.server_topics_list_wg)
+        splitter_top.addWidget(self.server_topics_panel_wg)
+
+        # Define the bottom splitter
         splitter_bottom = QSplitter(self)
-        splitter_bottom.splitterMoved.connect(self.configure_topics_panel)
-        splitter_bottom.addWidget(self.topics_list_widget)
-        splitter_bottom.addWidget(self.topics_panel_widget)
+        splitter_bottom.addWidget(self.client_topics_list_wg)
+        splitter_bottom.addWidget(self.client_topics_panel_wg)
 
         # Define the main layout for window
         ly_main = QVBoxLayout()
         ly_main.addLayout(ly_top, stretch=1)
+        ly_main.addWidget(splitter_top, stretch=10)
         ly_main.addWidget(splitter_bottom, stretch=10)
 
         # Define the central widget and set the layout
@@ -402,22 +412,22 @@ class RosboardClientGui(QMainWindow):
         current size of the user interface. This in turn allows the interface
         to be responsive depending on its size.
         """
-        ui_width = self.topics_panel_widget.size().width()
+        ui_width = self.server_topics_panel_wg.size().width()
         if ui_width < 501:
-            self.topics_panel_widget.MAX_COLS = 1
-            self.topics_panel_widget.configure_panel()
+            self.server_topics_panel_wg.MAX_COLS = 1
+            self.server_topics_panel_wg.configure_panel()
         if ui_width > 500 and ui_width < 701:
-            self.topics_panel_widget.MAX_COLS = 2
-            self.topics_panel_widget.configure_panel()
+            self.server_topics_panel_wg.MAX_COLS = 2
+            self.server_topics_panel_wg.configure_panel()
         if ui_width > 700 and ui_width < 901:
-            self.topics_panel_widget.MAX_COLS = 3
-            self.topics_panel_widget.configure_panel()
+            self.server_topics_panel_wg.MAX_COLS = 3
+            self.server_topics_panel_wg.configure_panel()
         if ui_width > 900 and ui_width < 1101:
-            self.topics_panel_widget.MAX_COLS = 4
-            self.topics_panel_widget.configure_panel()
+            self.server_topics_panel_wg.MAX_COLS = 4
+            self.server_topics_panel_wg.configure_panel()
         if ui_width > 1100 and ui_width < 1301:
-            self.topics_panel_widget.MAX_COLS = 5
-            self.topics_panel_widget.configure_panel()
+            self.server_topics_panel_wg.MAX_COLS = 5
+            self.server_topics_panel_wg.configure_panel()
 
     def reset_network_attributes(self):
         """! Reset the network-related attributes of the class."""
@@ -463,7 +473,7 @@ class RosboardClientGui(QMainWindow):
         """! Restore the interface after a reconnection."""
         self.node.get_logger().info("Restoring interface after reconnection.")
         # Get current topics to restore them later.
-        current_topics = self.topics_panel_widget.get_current_topics()
+        current_topics = self.server_topics_panel_wg.get_current_topics()
 
         # Delete the topic handlers.
         for topic in list(self.topic_handlers.keys()):
@@ -471,13 +481,13 @@ class RosboardClientGui(QMainWindow):
             del self.topic_handlers[topic]
 
         # Clean the interface
-        self.topics_list_widget.clear_list()
-        self.topics_panel_widget.remove_all_topics()
+        self.server_topics_list_wg.clear_list()
+        self.server_topics_panel_wg.remove_all_topics()
 
         # Configure the interface
         available_topics = self.client.get_available_topics()
         for topic in available_topics:
-            self.topics_list_widget.add_topic(topic)
+            self.server_topics_list_wg.add_topic(topic)
         for topic in current_topics:
             self.add_topic_to_panel(topic)
 
@@ -543,18 +553,18 @@ class RosboardClientGui(QMainWindow):
             current_topics = self.client.get_available_topics()
 
             # Remove topics from topic list
-            list_topics = self.topics_list_widget.get_current_topics()
+            list_topics = self.server_topics_list_wg.get_current_topics()
             for topic in self.available_topics:
                 if topic not in current_topics:
                     if topic in list_topics:
-                        self.topics_list_widget.remove_topic(topic)
+                        self.server_topics_list_wg.remove_topic(topic)
                     self.available_topics.remove(topic)
 
             # Add new topics to interface
             for topic in current_topics:
                 if topic not in self.available_topics:
                     self.available_topics.append(topic)
-                    self.add_topic_to_list_remove_from_panel(topic)
+                    self.move_from_server_panel_to_list(topic)
 
     def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
@@ -634,7 +644,12 @@ class RosboardClientGui(QMainWindow):
                 self.topic_handlers = {}
                 self.available_topics = self.client.get_available_topics()
                 for topic in self.available_topics:
-                    self.topics_list_widget.add_topic(topic)
+                    self.server_topics_list_wg.add_topic(topic)
+
+                # Get topics from client and add them to the client topics list
+                self.client_topics = self.node.get_topic_names_and_types()
+                for topic in self.client_topics:
+                    self.client_topics_list_wg.add_topic(topic[0])
 
                 # Start the timers to update topics list, stats and restore interface
                 self.topic_stats_timer.start(250)
@@ -677,8 +692,8 @@ class RosboardClientGui(QMainWindow):
         self.reset_network_attributes()
 
         # Restore the interface to the disconnected status
-        self.topics_list_widget.clear_list()
-        self.topics_panel_widget.remove_all_topics()
+        self.server_topics_list_wg.clear_list()
+        self.server_topics_panel_wg.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.connection_widget.set_buttons_status(self.is_connected)
         self.connection_widget.set_status_label("DISCONNECTED")
@@ -696,8 +711,8 @@ class RosboardClientGui(QMainWindow):
             self.topic_handlers[topic_name] = TopicHandler(
                 topic_name, self.client, self.node
             )
-            self.topics_list_widget.remove_topic(topic_name)
-            self.topics_panel_widget.add_topic(topic_name)
+            self.server_topics_list_wg.remove_topic(topic_name)
+            self.server_topics_panel_wg.add_topic(topic_name)
         except ModuleNotFoundError as e:
             self.show_warning_message(
                 "Can not load message!", "Can not load topic message type!"
@@ -708,7 +723,15 @@ class RosboardClientGui(QMainWindow):
                 "Attempted to subscribe to unavailable topic!"
             )
 
-    def add_topic_to_list_remove_from_panel(self, topic_name: str):
+    def add_client_to_panel(self, topic_name: str):
+        self.client_topics_panel_wg.add_topic(topic_name)
+        self.client_topics_list_wg.remove_topic(topic_name)
+
+    def move_from_client_panel_to_list(self, topic_name: str):
+        self.client_topics_panel_wg.remove_topic(topic_name)
+        self.client_topics_list_wg.insert_topic(topic_name)
+
+    def move_from_server_panel_to_list(self, topic_name: str):
         """! Add a topic to list widget and remove it from panel if necessary
 
         Calling this method will add a given topic to the topics list in
@@ -720,8 +743,8 @@ class RosboardClientGui(QMainWindow):
         if topic_name in self.topic_handlers.keys():
             self.topic_handlers[topic_name].destroy_subscription()
             del self.topic_handlers[topic_name]
-            self.topics_panel_widget.remove_topic(topic_name)
-        self.topics_list_widget.insert_topic(topic_name)
+            self.server_topics_panel_wg.remove_topic(topic_name)
+        self.server_topics_list_wg.insert_topic(topic_name)
 
     def update_topic_stats_and_state(self):
         """! Update the handled topic statistics and state."""
@@ -730,8 +753,8 @@ class RosboardClientGui(QMainWindow):
         for topic in self.topic_handlers.keys():
             topic_stats[topic] = self.topic_handlers[topic].get_topic_stats()
             topic_state[topic] = self.topic_handlers[topic].state
-        self.topics_panel_widget.update_topic_stats(topic_stats)
-        self.topics_panel_widget.update_topic_state(topic_state)
+        self.server_topics_panel_wg.update_topic_stats(topic_stats)
+        self.server_topics_panel_wg.update_topic_state(topic_state)
 
 
 class ConnectionWidget(QWidget):
