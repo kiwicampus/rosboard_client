@@ -65,6 +65,10 @@ class TopicHandler:
         @param topic_name "str" name of the topic being handled.
         @param client "RosboardClient" client for the topic.
         @param node "Node" ROS node instance to communicate with ROS.
+        @param alpha "float" (0.1 by default) alpha parameter for calculating
+        the moving average of values.
+        @param state_sleep "float" (0.25 by default) the sleep time in which
+        the topic state is checked.
         """
         # Initialize attributes
         self.node = node
@@ -134,7 +138,6 @@ class TopicHandler:
             if self.n_msgs > 1:
                 t_current = time()
                 mean = (t_current - self.t_start) / self.n_msgs
-                print(f"{self.last_period - mean} vs {self.last_period_var**0.5}")
                 if t_current - self.t_last_msg > 5.0:
                     self.state = "NO_DATA"
                 elif abs(self.last_period - mean) > 2 * (self.last_period_var**0.5):
@@ -854,7 +857,6 @@ class StatsWidget(QWidget):
         @param parent "RosboardClientGui" establish the parent class of the
         widget.
         """
-        print(type(parent))
         super(QWidget, self).__init__(parent)
 
         # Define the labels to store the stats. values.
