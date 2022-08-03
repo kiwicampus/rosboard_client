@@ -65,6 +65,10 @@ class TopicHandler:
         @param topic_name "str" name of the topic being handled.
         @param client "RosboardClient" client for the topic.
         @param node "Node" ROS node instance to communicate with ROS.
+        @param alpha "float" (0.1 by default) alpha parameter for calculating
+        the moving average of values.
+        @param state_sleep "float" (0.25 by default) the sleep time in which
+        the topic state is checked.
         """
         # Initialize attributes
         self.node = node
