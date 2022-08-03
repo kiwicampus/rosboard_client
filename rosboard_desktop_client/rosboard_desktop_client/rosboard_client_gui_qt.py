@@ -43,6 +43,7 @@ from PyQt5.QtWidgets import (
     QSplitter,
 )
 
+from rosboard_desktop_client.streamers import GenericStreamer
 from rosboard_desktop_client.networking import RosboardClient
 from rosboard_desktop_client.republishers import PublisherManager
 
@@ -325,6 +326,9 @@ class RosboardClientGui(QMainWindow):
             self, TopicWidget, self.move_from_client_panel_to_list
         )
 
+        # List to store streamers
+        self.streamers = []
+
         # Define the top layout (connection + stats)
         ly_top = QHBoxLayout()
         ly_top.addWidget(self.connection_widget, 7)
@@ -555,6 +559,11 @@ class RosboardClientGui(QMainWindow):
             # Get the currently available topics
             current_topics = self.client.get_available_topics()
 
+            # Get the client available topics
+            client_current_topics = [
+                topic[0] for topic in self.node.get_topic_names_and_types()
+            ]
+
             # Remove topics from topic list
             list_topics = self.server_topics_list_wg.get_current_topics()
             for topic in self.available_topics:
@@ -568,6 +577,20 @@ class RosboardClientGui(QMainWindow):
                 if topic not in self.available_topics:
                     self.available_topics.append(topic)
                     self.move_from_server_panel_to_list(topic)
+
+            # Remove topics from client topic list
+            client_old_topics = self.client_topics_list_wg.get_current_topics()
+            for topic in self.client_topics:
+                if topic not in client_current_topics:
+                    if topic in client_old_topics:
+                        self.client_topics_list_wg.remove_topic(topic)
+                    self.client_topics.remove(topic)
+
+            # Add new client topics to list
+            for topic in client_current_topics:
+                if topic not in self.client_topics:
+                    self.client_topics.append(topic)
+                    self.move_from_client_panel_to_list(topic)
 
     def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
@@ -650,9 +673,11 @@ class RosboardClientGui(QMainWindow):
                     self.server_topics_list_wg.add_topic(topic)
 
                 # Get topics from client and add them to the client topics list
-                self.client_topics = self.node.get_topic_names_and_types()
-                for topic in self.client_topics:
-                    self.client_topics_list_wg.add_topic(topic[0])
+                self.client_topics = [
+                    topic[0] for topic in self.node.get_topic_names_and_types()
+                ]
+                for topic_name in self.client_topics:
+                    self.client_topics_list_wg.add_topic(topic_name)
 
                 # Start the timers to update topics list, stats and restore interface
                 self.topic_stats_timer.start(250)
@@ -697,6 +722,8 @@ class RosboardClientGui(QMainWindow):
         # Restore the interface to the disconnected status
         self.server_topics_list_wg.clear_list()
         self.server_topics_panel_wg.remove_all_topics()
+        self.client_topics_list_wg.clear_list()
+        self.client_topics_panel_wg.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.connection_widget.set_buttons_status(self.is_connected)
         self.connection_widget.set_status_label("DISCONNECTED")
@@ -727,10 +754,15 @@ class RosboardClientGui(QMainWindow):
             )
 
     def add_client_to_panel(self, topic_name: str):
+        self.streamers.append(GenericStreamer(self.node, self.client, topic_name))
         self.client_topics_panel_wg.add_topic(topic_name)
         self.client_topics_list_wg.remove_topic(topic_name)
 
     def move_from_client_panel_to_list(self, topic_name: str):
+        for current_index in range(len(self.streamers)):
+            if self.streamers[current_index].topic_name == topic_name:
+                topic_streamer = self.streamers.pop(current_index)
+                topic_streamer.destroy_subscription()
         self.client_topics_panel_wg.remove_topic(topic_name)
         self.client_topics_list_wg.insert_topic(topic_name)
 
