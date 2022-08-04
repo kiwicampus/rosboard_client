@@ -338,12 +338,13 @@ class RosboardClientGui(QMainWindow):
 
         # Define the top splitter (topics list + topic stats)
         self.splitter_top = QSplitter(self)
-        self.splitter_top.splitterMoved.connect(self.configure_topics_panel)
+        self.splitter_top.splitterMoved.connect(self.configure_server_panel)
         self.splitter_top.addWidget(self.server_topics_list_wg)
         self.splitter_top.addWidget(self.server_topics_panel_wg)
 
         # Define the bottom splitter
         self.splitter_bottom = QSplitter(self)
+        self.splitter_bottom.splitterMoved.connect(self.configure_client_panel)
         self.splitter_bottom.addWidget(self.client_topics_list_wg)
         self.splitter_bottom.addWidget(self.client_topics_panel_wg)
 
@@ -424,23 +425,26 @@ class RosboardClientGui(QMainWindow):
 
     def resizeEvent(self, event: PyQt5.QtGui.QResizeEvent):
         """Update the user interface on resize."""
-        self.configure_topics_panel()
+        self.configure_server_panel()
+        self.configure_client_panel()
         super().resizeEvent(event)
 
     def toggle_top(self):
         if self.top_cb.isChecked():
             self.splitter_top.show()
+            self.configure_server_panel()
         else:
             self.splitter_top.hide()
 
     def toggle_bottom(self):
         if self.bottom_cb.isChecked():
             self.splitter_bottom.show()
+            self.configure_client_panel()
         else:
             self.splitter_bottom.hide()
 
-    def configure_topics_panel(self):
-        """! Configure the topics panel columns.
+    def configure_server_panel(self):
+        """! Configure the server panel columns.
 
         The topics panel number of columns is adjusted depending on the
         current size of the user interface. This in turn allows the interface
@@ -462,6 +466,30 @@ class RosboardClientGui(QMainWindow):
         if ui_width > 1100 and ui_width < 1301:
             self.server_topics_panel_wg.MAX_COLS = 5
             self.server_topics_panel_wg.configure_panel()
+
+    def configure_client_panel(self):
+        """! Configure the client panel columns.
+
+        The topics panel number of columns is adjusted depending on the
+        current size of the user interface. This in turn allows the interface
+        to be responsive depending on its size.
+        """
+        ui_width = self.client_topics_panel_wg.size().width()
+        if ui_width < 501:
+            self.client_topics_panel_wg.MAX_COLS = 1
+            self.client_topics_panel_wg.configure_panel()
+        if ui_width > 500 and ui_width < 701:
+            self.client_topics_panel_wg.MAX_COLS = 2
+            self.client_topics_panel_wg.configure_panel()
+        if ui_width > 700 and ui_width < 901:
+            self.client_topics_panel_wg.MAX_COLS = 3
+            self.client_topics_panel_wg.configure_panel()
+        if ui_width > 900 and ui_width < 1101:
+            self.client_topics_panel_wg.MAX_COLS = 4
+            self.client_topics_panel_wg.configure_panel()
+        if ui_width > 1100 and ui_width < 1301:
+            self.client_topics_panel_wg.MAX_COLS = 5
+            self.client_topics_panel_wg.configure_panel()
 
     def reset_network_attributes(self):
         """! Reset the network-related attributes of the class."""
@@ -715,9 +743,9 @@ class RosboardClientGui(QMainWindow):
                     self.server_topics_list_wg.add_topic(topic)
 
                 # Get topics from client and add them to the client topics list
-                self.client_topics = [
-                    topic[0] for topic in self.node.get_topic_names_and_types()
-                ]
+                for topic in self.node.get_topic_names_and_types():
+                    print(topic[0])
+                
                 for topic_name in self.client_topics:
                     self.client_topics_list_wg.add_topic(topic_name)
 
