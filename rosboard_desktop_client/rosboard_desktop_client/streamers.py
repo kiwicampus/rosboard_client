@@ -53,6 +53,7 @@ class GenericStreamer:
         Raises:
             Exception: in case that the subscription exists and can not be destroyed.
         """
+        self.parent_rosboard_client.destroy_socket_publisher(self.topic_name)
         if self.subscriber is not None:
             if not self.parent_node.destroy_subscription(self.subscriber):
                 raise Exception(

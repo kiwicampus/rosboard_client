@@ -81,6 +81,7 @@ class WebsocketV1Transport:
     MSG_SUB = "s"
     MSG_SYSTEM = "y"
     MSG_UNSUB = "u"
+    MSG_UNPUB = "n"
     PING_SEQ = "s"
     PONG_SEQ = "s"
     PONG_TIME = "t"
@@ -322,6 +323,19 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             # rosboard expects a message like this" ["u", {topicName: xxx}] to destroy the subscription
             json.dumps(
                 [WebsocketV1Transport.MSG_UNSUB, {"topicName": topic_name}]
+            ).encode("utf-8"),
+        )
+
+    def destroy_socket_publisher(self, topic_name: str):
+        """! Function to destroy publisher of a topic in server.
+        @param topic_name "str" name of the topic publisher that will be destroyed.
+        """
+        self.logger.info(f"Destroying publisher for topic {topic_name}")
+        # Send message to destroy publisher in server. Message is expected to be: ["n", {topicName: xxxx}]
+        self._proto.send_message(
+            #
+            json.dumps(
+                [WebsocketV1Transport().MSG_UNPUB, {"topicName": topic_name}]
             ).encode("utf-8"),
         )
 
