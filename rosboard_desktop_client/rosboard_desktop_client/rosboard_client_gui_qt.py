@@ -328,7 +328,8 @@ class RosboardClientGui(QMainWindow):
             self, TopicWidget, self.move_from_client_panel_to_list
         )
 
-        # List to store streamers
+        # List to store streamers and client topics
+        self.client_topics = []
         self.streamers = []
 
         # Define the top layout (connection + stats)
@@ -615,9 +616,7 @@ class RosboardClientGui(QMainWindow):
             current_topics = self.client.get_available_topics()
 
             # Get the client available topics
-            client_current_topics = [
-                topic[0] for topic in self.node.get_topic_names_and_types()
-            ]
+            client_current_topics = self.get_current_local_topics()
 
             # Get the topics streamed from server
             topics_from_server = self.server_topics_panel_wg.get_current_topics()
@@ -743,8 +742,7 @@ class RosboardClientGui(QMainWindow):
                     self.server_topics_list_wg.add_topic(topic)
 
                 # Get topics from client and add them to the client topics list
-                for topic in self.node.get_topic_names_and_types():
-                    print(topic[0])
+                self.client_topics = self.get_current_local_topics()
                 
                 for topic_name in self.client_topics:
                     self.client_topics_list_wg.add_topic(topic_name)
@@ -764,6 +762,7 @@ class RosboardClientGui(QMainWindow):
                 self.connection_widget.set_status_label("CONNECTED")
 
             except Exception as e:
+                self.node.get_logger().error(e)
                 self.show_warning_message(
                     "Timeout while connecting",
                     "There was a timeout when trying to connect to server.",
@@ -798,6 +797,16 @@ class RosboardClientGui(QMainWindow):
         self.connection_widget.set_buttons_status(self.is_connected)
         self.connection_widget.set_status_label("DISCONNECTED")
 
+    def get_current_local_topics(self) -> list:
+        """! Function to get available topics from client side.
+        @return "list" topic names available in the client.
+        """
+        current_topics = []
+        for topic in self.node.get_topic_names_and_types():
+            if len(self.node.get_publishers_info_by_topic(topic[0])) > 0:
+                current_topics.append(topic[0])
+        return current_topics
+
     def add_topic_to_panel(self, topic_name: str):
         """! Add a topic to the topics panel widget and create its handler.
 
@@ -824,11 +833,17 @@ class RosboardClientGui(QMainWindow):
             )
 
     def add_client_to_panel(self, topic_name: str):
+        """! Create a topic streamer and add it to panel.
+        @param topic_name "str" name of the topic that will be streamed.        
+        """
         self.streamers.append(GenericStreamer(self.node, self.client, topic_name))
         self.client_topics_panel_wg.add_topic(topic_name)
         self.client_topics_list_wg.remove_topic(topic_name)
 
     def move_from_client_panel_to_list(self, topic_name: str):
+        """! Stop streaming topic and add it to list.
+        @param topic_name "str" name of the topic that will stop streaming.
+        """
         for current_index in range(len(self.streamers)):
             if self.streamers[current_index].topic_name == topic_name:
                 topic_streamer = self.streamers.pop(current_index)
