@@ -338,6 +338,7 @@ class RosboardClientGui(QMainWindow):
         # List to store streamers and client topics
         self.client_topics = []
         self.streamers = []
+        self.stream_watchlist = []
 
         # Define the top layout (connection + stats)
         ly_top = QHBoxLayout()
@@ -638,12 +639,15 @@ class RosboardClientGui(QMainWindow):
 
             # Mutually remove those topics
             for topic in topics_from_server:
-                if topic in client_current_topics:
+                if topic in client_current_topics or topic in self.stream_watchlist:
                     client_current_topics.remove(topic)
 
             for topic in topics_to_server:
                 if topic in current_topics:
                     current_topics.remove(topic)
+
+            # Restore watchlist
+            self.stream_watchlist = []
 
             # Remove topics from topic list
             list_topics = self.server_topics_list_wg.get_current_topics()
@@ -860,6 +864,7 @@ class RosboardClientGui(QMainWindow):
             if self.streamers[current_index].topic_name == topic_name:
                 topic_streamer = self.streamers.pop(current_index)
                 topic_streamer.destroy_subscription()
+                break
         self.client_topics_panel_wg.remove_topic(topic_name)
         self.client_topics_list_wg.insert_topic(topic_name)
 
@@ -877,6 +882,7 @@ class RosboardClientGui(QMainWindow):
             del self.topic_handlers[topic_name]
             self.server_topics_panel_wg.remove_topic(topic_name)
         self.server_topics_list_wg.insert_topic(topic_name)
+        self.stream_watchlist.append(topic_name)
 
     def update_topic_stats_and_state(self):
         """! Update the handled topic statistics and state."""
