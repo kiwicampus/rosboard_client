@@ -625,57 +625,40 @@ class RosboardClientGui(QMainWindow):
         # Check if the client is connected to the server
         if self.client.protocol.is_connected:
 
-            # Get the currently available topics
-            current_topics = self.client.get_available_topics()
-
-            # Get the client available topics
+            # Get the server and client available topics
+            server_current_topics = self.client.get_available_topics()
             client_current_topics = self.get_current_local_topics()
 
             # Get the topics streamed from server
-            topics_from_server = self.server_topics_panel_wg.get_current_topics()
+            subscribed_topics = self.server_topics_panel_wg.get_current_topics()
+            streamed_topics = self.client_topics_panel_wg.get_current_topics()
 
-            # Get the topics streamed to server
-            topics_to_server = self.client_topics_panel_wg.get_current_topics()
+            # List to store available topics
+            server_available_topics, client_available_topics = [], []
 
-            # Mutually remove those topics
-            for topic in topics_from_server:
-                if topic in client_current_topics or topic in self.stream_watchlist:
-                    client_current_topics.remove(topic)
+            # Server available topics
+            for topic in server_current_topics:
+                if topic not in subscribed_topics and topic not in self.stream_watchlist and topic not in streamed_topics:
+                    server_available_topics.append(topic)
 
-            for topic in topics_to_server:
-                if topic in current_topics:
-                    current_topics.remove(topic)
-
-            # Restore watchlist
+            # Clear the watchlist
             self.stream_watchlist = []
 
-            # Remove topics from topic list
-            list_topics = self.server_topics_list_wg.get_current_topics()
-            for topic in self.available_topics:
-                if topic not in current_topics:
-                    if topic in list_topics:
-                        self.server_topics_list_wg.remove_topic(topic)
-                    self.available_topics.remove(topic)
-
-            # Add new topics to interface
-            for topic in current_topics:
-                if topic not in self.available_topics:
-                    self.available_topics.append(topic)
-                    self.move_from_server_panel_to_list(topic)
-
-            # Remove topics from client topic list
-            client_old_topics = self.client_topics_list_wg.get_current_topics()
-            for topic in self.client_topics:
-                if topic not in client_current_topics:
-                    if topic in client_old_topics:
-                        self.client_topics_list_wg.remove_topic(topic)
-                    self.client_topics.remove(topic)
-
-            # Add new client topics to list
+            # Client available topics
             for topic in client_current_topics:
-                if topic not in self.client_topics:
-                    self.client_topics.append(topic)
-                    self.move_from_client_panel_to_list(topic)
+                if topic not in streamed_topics:
+                    client_available_topics.append(topic)
+
+            # Clear the lists
+            self.client_topics_list_wg.clear_list()
+            self.server_topics_list_wg.clear_list()
+
+            # Populate lists
+            for topic in server_available_topics:
+                self.server_topics_list_wg.add_topic(topic)
+
+            for topic in client_available_topics:
+                self.client_topics_list_wg.add_topic(topic)
 
     def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
@@ -843,7 +826,7 @@ class RosboardClientGui(QMainWindow):
                 "Can not load message!", "Can not load topic message type!"
             )
         except Exception as e:
-            print(e)
+            self.server_topics_list_wg.remove_topic(topic_name)
             self.node.get_logger().warning(
                 "Attempted to subscribe to unavailable topic!"
             )
