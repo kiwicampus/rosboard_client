@@ -43,6 +43,7 @@ from PyQt5.QtWidgets import (
     QSplitter,
     QCheckBox,
 )
+from PyQt5.QtGui import QIcon
 
 from rosboard_desktop_client.streamers import GenericStreamer
 from rosboard_desktop_client.networking import RosboardClient
@@ -303,6 +304,12 @@ class RosboardClientGui(QMainWindow):
         with open(stylesheet_path, "r") as ss_file:
             self.setStyleSheet(ss_file.read())
 
+        # Set the icon
+        icon_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "resources", "icon.png"
+        )
+        self.setWindowIcon(QIcon(icon_path))
+
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
 
@@ -535,8 +542,13 @@ class RosboardClientGui(QMainWindow):
     def restore_interface(self):
         """! Restore the interface after a reconnection."""
         self.node.get_logger().info("Restoring interface after reconnection.")
+
         # Get current topics to restore them later.
         current_topics = self.server_topics_panel_wg.get_current_topics()
+
+        # Remove topics that are being streamed
+        streamed_topics = self.get_current_local_topics()
+        current_topics = [topic for topic in current_topics if topic not in streamed_topics]
 
         # Delete the topic handlers.
         for topic in list(self.topic_handlers.keys()):
