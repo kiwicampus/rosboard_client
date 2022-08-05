@@ -41,9 +41,9 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QMessageBox,
     QSplitter,
-    QCheckBox,
+    QCheckBox
 )
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPixmap
 
 from rosboard_desktop_client.streamers import GenericStreamer
 from rosboard_desktop_client.networking import RosboardClient
@@ -310,6 +310,16 @@ class RosboardClientGui(QMainWindow):
         )
         self.setWindowIcon(QIcon(icon_path))
 
+        # Set the logo
+        logo_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "resources", "logo.png"
+        )
+        pixmap = QPixmap(logo_path)
+        pixmap = pixmap.scaled(200, 200, Qt.KeepAspectRatio)
+
+        lb_logo = QLabel()
+        lb_logo.setPixmap(pixmap)
+
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
 
@@ -322,10 +332,11 @@ class RosboardClientGui(QMainWindow):
 
         # Main window configurations
         self.setWindowTitle("Rosboard Client GUI")
+        self.setAccessibleName("")
 
         # Initialize custom widgets
         self.connection_widget = ConnectionWidget(self)
-        self.stats_widget = StatsWidget(self)
+        self.stats_widget = StatusWidget(self)
         self.server_topics_list_wg = TopicsListWidget(self, self.add_topic_to_panel)
         self.server_topics_panel_wg = TopicsPanelWidget(
             self, ExtendedTopicWidget, self.move_from_server_panel_to_list
@@ -341,9 +352,12 @@ class RosboardClientGui(QMainWindow):
         self.stream_watchlist = []
 
         # Define the top layout (connection + stats)
-        ly_top = QHBoxLayout()
-        ly_top.addWidget(self.connection_widget, 7, Qt.AlignTop)
-        ly_top.addWidget(self.stats_widget, 3, Qt.AlignTop)
+        ly_top = QGridLayout()
+        ly_top.addWidget(lb_logo, 0, 0, 2, 1, Qt.AlignCenter)
+        ly_top.addWidget(self.connection_widget, 0, 1, Qt.AlignTop)
+        ly_top.addWidget(self.stats_widget, 1, 1, Qt.AlignTop)
+        ly_top.setColumnStretch(0, 2)
+        ly_top.setColumnStretch(1, 8)
 
         # Define the top splitter (topics list + topic stats)
         self.splitter_top = QSplitter(self)
@@ -646,7 +660,7 @@ class RosboardClientGui(QMainWindow):
 
             # Client available topics
             for topic in client_current_topics:
-                if topic not in streamed_topics:
+                if topic not in streamed_topics and topic not in subscribed_topics:
                     client_available_topics.append(topic)
 
             # Clear the lists
@@ -922,12 +936,10 @@ class ConnectionWidget(QWidget):
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
         ly_widget.setContentsMargins(0, 0, 0, 0)
-        ly_widget.addWidget(QLabel("ADDRESS:"), 0, 0, 1, 2, Qt.AlignCenter)
-        ly_widget.addWidget(self.address_le, 1, 0, 1, 2)
-        ly_widget.addWidget(self.connect_bt, 2, 0)
-        ly_widget.addWidget(self.disconnect_bt, 2, 1)
-        ly_widget.addWidget(self.status_lb, 3, 0, 1, 2, Qt.AlignCenter)
-
+        ly_widget.addWidget(self.address_le, 0, 0, 1, 2)
+        ly_widget.addWidget(self.connect_bt, 1, 0)
+        ly_widget.addWidget(self.disconnect_bt, 1, 1)
+        ly_widget.addWidget(self.status_lb, 2, 0, 1, 2, Qt.AlignCenter)
         self.setLayout(ly_widget)
 
     def get_connection_address(self) -> str:
@@ -963,7 +975,7 @@ class ConnectionWidget(QWidget):
         self.setStyleSheet(ConnectionWidget.CONN_STATUS_DICT[status])
 
 
-class StatsWidget(QWidget):
+class StatusWidget(QWidget):
     def __init__(self, parent: RosboardClientGui):
         """! Widget to present global statistics in the user interface.
 
@@ -978,15 +990,18 @@ class StatsWidget(QWidget):
         super(QWidget, self).__init__(parent)
 
         # Define the labels to store the stats. values.
-        self.cpu_usage_lb = QLabel("CPU USAGE: XXX.XX \t \t %")
-        self.roundtrip_lb = QLabel("ROUNDTRIP: XXX.XX \t \t ms")
-        self.download_lb = QLabel("DOWNLOAD: XXX.XX \t \t kbps")
+        self.cpu_usage_lb = QLabel("XXX.XX %")
+        self.roundtrip_lb = QLabel("XXX.XX ms")
+        self.download_lb = QLabel("XXXX.X kbps")
 
         # Define the widget layout
         ly_widget = QGridLayout()
-        ly_widget.addWidget(self.cpu_usage_lb, 0, 0)
-        ly_widget.addWidget(self.roundtrip_lb, 1, 0)
-        ly_widget.addWidget(self.download_lb, 2, 0)
+        ly_widget.addWidget(QLabel("CPU USAGE [%]"), 0, 0, Qt.AlignCenter)
+        ly_widget.addWidget(QLabel("ROUNDTRIP [ms]"), 0, 1, Qt.AlignCenter)
+        ly_widget.addWidget(QLabel("DOWNLOAD SPEED [kbps]"), 0, 2, Qt.AlignCenter)
+        ly_widget.addWidget(self.cpu_usage_lb, 1, 0, Qt.AlignCenter)
+        ly_widget.addWidget(self.roundtrip_lb, 1, 1, Qt.AlignCenter)
+        ly_widget.addWidget(self.download_lb, 1, 2, Qt.AlignCenter)
         self.setLayout(ly_widget)
 
     def update_stats_widget(self, cpu_usage: float, roundtrip: float, download: float):
@@ -996,9 +1011,9 @@ class StatsWidget(QWidget):
         @param roundtrip "float" value that represents the network delay.
         @param download "float" value that represents the download speed.
         """
-        self.cpu_usage_lb.setText(f"CPU USAGE: {cpu_usage:3.2f} %")
-        self.roundtrip_lb.setText(f"ROUNDTRIP: {roundtrip:3.2f} ms")
-        self.download_lb.setText(f"DOWNLOAD: {download:4.1f} kbps")
+        self.cpu_usage_lb.setText(f"{cpu_usage:3.2f} %")
+        self.roundtrip_lb.setText(f"{roundtrip:3.2f} ms")
+        self.download_lb.setText(f"{download:4.1f} kbps")
 
 
 class TopicsListWidget(QWidget):
@@ -1283,6 +1298,7 @@ class TopicsPanelWidget(QWidget):
 def main():
     rclpy.init(args=sys.argv)
     app = QApplication(sys.argv)
+    app.setApplicationName("Rosboard Desktop GUI")
     ui = RosboardClientGui()
     ui.showMaximized()
     sys.exit(app.exec())
