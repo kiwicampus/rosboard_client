@@ -42,7 +42,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QMessageBox,
     QSplitter,
-    QCheckBox
+    QCheckBox,
 )
 from PyQt5.QtGui import QIcon, QPixmap
 
@@ -349,13 +349,17 @@ class RosboardClientGui(QMainWindow):
 
         # Define the top splitter (topics list + topic stats)
         self.server_splitter = QSplitter(self)
-        self.server_splitter.splitterMoved.connect(partial(self.configure_panel, self.server_topics_panel_wg))
+        self.server_splitter.splitterMoved.connect(
+            partial(self.configure_panel, self.server_topics_panel_wg)
+        )
         self.server_splitter.addWidget(self.server_topics_list_wg)
         self.server_splitter.addWidget(self.server_topics_panel_wg)
 
         # Define the bottom splitter
         self.client_splitter = QSplitter(self)
-        self.client_splitter.splitterMoved.connect(partial(self.configure_panel, self.client_topics_panel_wg))
+        self.client_splitter.splitterMoved.connect(
+            partial(self.configure_panel, self.client_topics_panel_wg)
+        )
         self.client_splitter.addWidget(self.client_topics_list_wg)
         self.client_splitter.addWidget(self.client_topics_panel_wg)
 
@@ -442,7 +446,7 @@ class RosboardClientGui(QMainWindow):
 
     def toggle_top(self):
         """! Toggle the server (server to client) topic stream widget.
-        
+
         This method evaluates the checkbox status of the server widget. If
         the checkbox is set, the server widget is shown. If the checkbox is
         not set, the server widget will be hidden.
@@ -455,7 +459,7 @@ class RosboardClientGui(QMainWindow):
 
     def toggle_bottom(self):
         """! Toggle the client (client to server) topic stream widget.
-        
+
         This method evaluates the checkbox status of the client widget. If
         the checkbox is set, the client widget is shown. If the checkbox is
         not set, the client widget will be hidden.
@@ -547,7 +551,9 @@ class RosboardClientGui(QMainWindow):
 
         # Remove topics that are being streamed
         streamed_topics = self.get_current_local_topics()
-        current_topics = [topic for topic in current_topics if topic not in streamed_topics]
+        current_topics = [
+            topic for topic in current_topics if topic not in streamed_topics
+        ]
 
         # Delete the topic handlers.
         for topic in list(self.topic_handlers.keys()):
@@ -635,27 +641,41 @@ class RosboardClientGui(QMainWindow):
             server_available_topics, client_available_topics = [], []
 
             # Server available topics
-            for topic in server_current_topics:
-                if topic not in subscribed_topics and topic not in self.stream_watchlist and topic not in streamed_topics:
-                    server_available_topics.append(topic)
+            server_available_topics = [
+                topic
+                for topic in server_current_topics
+                if topic not in subscribed_topics
+                and topic not in self.stream_watchlist
+                and topic not in streamed_topics
+            ]
 
             # Clear the watchlist
             self.stream_watchlist = []
 
             # Client available topics
-            for topic in client_current_topics:
-                if topic not in streamed_topics and topic not in subscribed_topics:
-                    client_available_topics.append(topic)
+            client_available_topics = [
+                topic
+                for topic in client_current_topics
+                if topic not in streamed_topics and topic not in subscribed_topics
+            ]
 
             # Get topics present in lists
             server_topics_list = self.server_topics_list_wg.get_current_topics()
             client_topics_list = self.client_topics_list_wg.get_current_topics()
 
             # Get the difference between lists
-            server_add_topics = list(set(server_available_topics) - set(server_topics_list))
-            server_rm_topics = list(set(server_topics_list) - set(server_available_topics))
-            client_add_topics = list(set(client_available_topics) - set(client_topics_list))
-            client_rm_topics = list(set(client_topics_list) - set(client_available_topics))
+            server_add_topics = list(
+                set(server_available_topics) - set(server_topics_list)
+            )
+            server_rm_topics = list(
+                set(server_topics_list) - set(server_available_topics)
+            )
+            client_add_topics = list(
+                set(client_available_topics) - set(client_topics_list)
+            )
+            client_rm_topics = list(
+                set(client_topics_list) - set(client_available_topics)
+            )
 
             # Add topics to lists
             for topic in server_add_topics:
@@ -670,7 +690,6 @@ class RosboardClientGui(QMainWindow):
 
             for topic in client_rm_topics:
                 self.client_topics_list_wg.remove_topic(topic)
-
 
     def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
@@ -754,7 +773,7 @@ class RosboardClientGui(QMainWindow):
 
                 # Get topics from client and add them to the client topics list
                 self.client_topics = self.get_current_local_topics()
-                
+
                 for topic_name in self.client_topics:
                     self.client_topics_list_wg.add_topic(topic_name)
 
@@ -845,7 +864,7 @@ class RosboardClientGui(QMainWindow):
 
     def add_client_to_panel(self, topic_name: str):
         """! Create a topic streamer and add it to panel.
-        @param topic_name "str" name of the topic that will be streamed.        
+        @param topic_name "str" name of the topic that will be streamed.
         """
         self.streamers.append(GenericStreamer(self.node, self.client, topic_name))
         self.client_topics_panel_wg.add_topic(topic_name)
@@ -878,7 +897,7 @@ class RosboardClientGui(QMainWindow):
             del self.topic_handlers[topic_name]
             self.server_topics_panel_wg.remove_topic(topic_name)
         self.server_topics_list_wg.insert_topic(topic_name)
-        
+
     def update_topic_stats_and_state(self):
         """! Update the handled topic statistics and state."""
         topic_stats = {}
