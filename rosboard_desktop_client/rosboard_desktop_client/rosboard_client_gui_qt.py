@@ -347,35 +347,35 @@ class RosboardClientGui(QMainWindow):
         ly_top.addWidget(self.stats_widget)
 
         # Define the top splitter (topics list + topic stats)
-        self.splitter_top = QSplitter(self)
-        self.splitter_top.splitterMoved.connect(partial(self.configure_panel, self.server_topics_panel_wg))
-        self.splitter_top.addWidget(self.server_topics_list_wg)
-        self.splitter_top.addWidget(self.server_topics_panel_wg)
+        self.server_splitter = QSplitter(self)
+        self.server_splitter.splitterMoved.connect(partial(self.configure_panel, self.server_topics_panel_wg))
+        self.server_splitter.addWidget(self.server_topics_list_wg)
+        self.server_splitter.addWidget(self.server_topics_panel_wg)
 
         # Define the bottom splitter
-        self.splitter_bottom = QSplitter(self)
-        self.splitter_bottom.splitterMoved.connect(partial(self.configure_panel, self.client_topics_panel_wg))
-        self.splitter_bottom.addWidget(self.client_topics_list_wg)
-        self.splitter_bottom.addWidget(self.client_topics_panel_wg)
+        self.client_splitter = QSplitter(self)
+        self.client_splitter.splitterMoved.connect(partial(self.configure_panel, self.client_topics_panel_wg))
+        self.client_splitter.addWidget(self.client_topics_list_wg)
+        self.client_splitter.addWidget(self.client_topics_panel_wg)
 
         # Create checkboxes
-        self.top_cb = QCheckBox("Topics streaming from server")
-        self.top_cb.setChecked(True)
-        self.top_cb.stateChanged.connect(self.toggle_top)
-        self.bottom_cb = QCheckBox("Topics streaming to server")
-        self.bottom_cb.setChecked(False)
-        self.bottom_cb.stateChanged.connect(self.toggle_bottom)
+        self.server_cb = QCheckBox("Topics streaming from server")
+        self.server_cb.setChecked(True)
+        self.server_cb.stateChanged.connect(self.toggle_top)
+        self.client_cb = QCheckBox("Topics streaming to server")
+        self.client_cb.setChecked(False)
+        self.client_cb.stateChanged.connect(self.toggle_bottom)
 
         # Define the main layout for window
         ly_main = QVBoxLayout()
         ly_main.addLayout(ly_top, stretch=1)
-        ly_main.addWidget(self.top_cb)
-        ly_main.addWidget(self.splitter_top, stretch=10)
-        ly_main.addWidget(self.bottom_cb)
-        ly_main.addWidget(self.splitter_bottom, stretch=10)
+        ly_main.addWidget(self.server_cb)
+        ly_main.addWidget(self.server_splitter, stretch=10)
+        ly_main.addWidget(self.client_cb)
+        ly_main.addWidget(self.client_splitter, stretch=10)
 
         # Configure the bottom splitter to be hidden on default
-        self.splitter_bottom.hide()
+        self.client_splitter.hide()
 
         # Define the central widget and set the layout
         wg_main = QWidget(self)
@@ -440,18 +440,18 @@ class RosboardClientGui(QMainWindow):
         super().resizeEvent(event)
 
     def toggle_top(self):
-        if self.top_cb.isChecked():
-            self.splitter_top.show()
+        if self.server_cb.isChecked():
+            self.server_splitter.show()
             self.configure_panel(self.server_topics_panel_wg)
         else:
-            self.splitter_top.hide()
+            self.server_splitter.hide()
 
     def toggle_bottom(self):
-        if self.bottom_cb.isChecked():
-            self.splitter_bottom.show()
+        if self.client_cb.isChecked():
+            self.client_splitter.show()
             self.configure_panel(self.client_topics_panel_wg)
         else:
-            self.splitter_bottom.hide()
+            self.client_splitter.hide()
 
     def configure_panel(self, panel):
         """! Configure a panels columns according to its size.
