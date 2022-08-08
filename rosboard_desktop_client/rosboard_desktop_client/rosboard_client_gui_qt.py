@@ -310,16 +310,6 @@ class RosboardClientGui(QMainWindow):
         )
         self.setWindowIcon(QIcon(icon_path))
 
-        # Set the logo
-        logo_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "resources", "logo.png"
-        )
-        pixmap = QPixmap(logo_path)
-        pixmap = pixmap.scaled(200, 200, Qt.KeepAspectRatio)
-
-        lb_logo = QLabel()
-        lb_logo.setPixmap(pixmap)
-
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
 
@@ -352,12 +342,9 @@ class RosboardClientGui(QMainWindow):
         self.stream_watchlist = []
 
         # Define the top layout (connection + stats)
-        ly_top = QGridLayout()
-        ly_top.addWidget(lb_logo, 0, 0, 2, 1, Qt.AlignCenter)
-        ly_top.addWidget(self.connection_widget, 0, 1, Qt.AlignTop)
-        ly_top.addWidget(self.stats_widget, 1, 1, Qt.AlignTop)
-        ly_top.setColumnStretch(0, 2)
-        ly_top.setColumnStretch(1, 8)
+        ly_top = QVBoxLayout()
+        ly_top.addWidget(self.connection_widget)
+        ly_top.addWidget(self.stats_widget)
 
         # Define the top splitter (topics list + topic stats)
         self.splitter_top = QSplitter(self)
