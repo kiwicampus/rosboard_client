@@ -348,13 +348,13 @@ class RosboardClientGui(QMainWindow):
 
         # Define the top splitter (topics list + topic stats)
         self.splitter_top = QSplitter(self)
-        self.splitter_top.splitterMoved.connect(self.configure_server_panel)
+        self.splitter_top.splitterMoved.connect(partial(self.configure_panel, self.server_topics_panel_wg))
         self.splitter_top.addWidget(self.server_topics_list_wg)
         self.splitter_top.addWidget(self.server_topics_panel_wg)
 
         # Define the bottom splitter
         self.splitter_bottom = QSplitter(self)
-        self.splitter_bottom.splitterMoved.connect(self.configure_client_panel)
+        self.splitter_bottom.splitterMoved.connect(partial(self.configure_panel, self.client_topics_panel_wg))
         self.splitter_bottom.addWidget(self.client_topics_list_wg)
         self.splitter_bottom.addWidget(self.client_topics_panel_wg)
 
@@ -435,71 +435,55 @@ class RosboardClientGui(QMainWindow):
 
     def resizeEvent(self, event: PyQt5.QtGui.QResizeEvent):
         """Update the user interface on resize."""
-        self.configure_server_panel()
-        self.configure_client_panel()
+        self.configure_panel(self.server_topics_panel_wg)
+        self.configure_panel(self.client_topics_panel_wg)
         super().resizeEvent(event)
 
     def toggle_top(self):
         if self.top_cb.isChecked():
             self.splitter_top.show()
-            self.configure_server_panel()
+            self.configure_panel(self.server_topics_panel_wg)
         else:
             self.splitter_top.hide()
 
     def toggle_bottom(self):
         if self.bottom_cb.isChecked():
             self.splitter_bottom.show()
-            self.configure_client_panel()
+            self.configure_panel(self.client_topics_panel_wg)
         else:
             self.splitter_bottom.hide()
 
-    def configure_server_panel(self):
-        """! Configure the server panel columns.
+    def configure_panel(self, panel):
+        """! Configure a panels columns according to its size.
 
-        The topics panel number of columns is adjusted depending on the
-        current size of the user interface. This in turn allows the interface
-        to be responsive depending on its size.
+        This method configures the number of columns in a panel depending
+        on its width. The number of columns configuration is done according
+        to the following breakpoints:
+         - (width < 500): single (1) column.
+         - (500 < width < 700): two (2) columns.
+         - (700 < width < 900): three (3) columns.
+         - (900 < width < 1100): four (4) columns.
+         - (width > 1100): five (5) columns.
+
+        @param panel "" instance of a panel that will be configured depending
+        on its size.
         """
-        ui_width = self.server_topics_panel_wg.size().width()
-        if ui_width < 501:
-            self.server_topics_panel_wg.MAX_COLS = 1
-            self.server_topics_panel_wg.configure_panel()
-        if ui_width > 500 and ui_width < 701:
-            self.server_topics_panel_wg.MAX_COLS = 2
-            self.server_topics_panel_wg.configure_panel()
-        if ui_width > 700 and ui_width < 901:
-            self.server_topics_panel_wg.MAX_COLS = 3
-            self.server_topics_panel_wg.configure_panel()
-        if ui_width > 900 and ui_width < 1101:
-            self.server_topics_panel_wg.MAX_COLS = 4
-            self.server_topics_panel_wg.configure_panel()
-        if ui_width > 1100 and ui_width < 1301:
-            self.server_topics_panel_wg.MAX_COLS = 5
-            self.server_topics_panel_wg.configure_panel()
-
-    def configure_client_panel(self):
-        """! Configure the client panel columns.
-
-        The topics panel number of columns is adjusted depending on the
-        current size of the user interface. This in turn allows the interface
-        to be responsive depending on its size.
-        """
-        ui_width = self.client_topics_panel_wg.size().width()
-        if ui_width < 501:
-            self.client_topics_panel_wg.MAX_COLS = 1
-            self.client_topics_panel_wg.configure_panel()
-        if ui_width > 500 and ui_width < 701:
-            self.client_topics_panel_wg.MAX_COLS = 2
-            self.client_topics_panel_wg.configure_panel()
-        if ui_width > 700 and ui_width < 901:
-            self.client_topics_panel_wg.MAX_COLS = 3
-            self.client_topics_panel_wg.configure_panel()
-        if ui_width > 900 and ui_width < 1101:
-            self.client_topics_panel_wg.MAX_COLS = 4
-            self.client_topics_panel_wg.configure_panel()
-        if ui_width > 1100 and ui_width < 1301:
-            self.client_topics_panel_wg.MAX_COLS = 5
-            self.client_topics_panel_wg.configure_panel()
+        panel_width = panel.size().width()
+        if panel_width < 501:
+            panel.MAX_COLS = 1
+            panel.configure_panel()
+        if panel_width > 500 and panel_width < 701:
+            panel.MAX_COLS = 2
+            panel.configure_panel()
+        if panel_width > 700 and panel_width < 901:
+            panel.MAX_COLS = 3
+            panel.configure_panel()
+        if panel_width > 900 and panel_width < 1101:
+            panel.MAX_COLS = 4
+            panel.configure_panel()
+        if panel_width > 1100 and panel_width < 1301:
+            panel.MAX_COLS = 5
+            panel.configure_panel()
 
     def reset_network_attributes(self):
         """! Reset the network-related attributes of the class."""
