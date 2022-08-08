@@ -440,6 +440,12 @@ class RosboardClientGui(QMainWindow):
         super().resizeEvent(event)
 
     def toggle_top(self):
+        """! Toggle the server (server to client) topic stream widget.
+        
+        This method evaluates the checkbox status of the server widget. If
+        the checkbox is set, the server widget is shown. If the checkbox is
+        not set, the server widget will be hidden.
+        """
         if self.server_cb.isChecked():
             self.server_splitter.show()
             self.configure_panel(self.server_topics_panel_wg)
@@ -447,6 +453,12 @@ class RosboardClientGui(QMainWindow):
             self.server_splitter.hide()
 
     def toggle_bottom(self):
+        """! Toggle the client (client to server) topic stream widget.
+        
+        This method evaluates the checkbox status of the client widget. If
+        the checkbox is set, the client widget is shown. If the checkbox is
+        not set, the client widget will be hidden.
+        """
         if self.client_cb.isChecked():
             self.client_splitter.show()
             self.configure_panel(self.client_topics_panel_wg)
