@@ -13,6 +13,7 @@ import os
 import re
 import sys
 from typing import Tuple
+import bisect
 
 import rclpy
 from rclpy.node import Node
@@ -1078,18 +1079,10 @@ class TopicsListWidget(QWidget):
         button = QPushButton(topic_name)
         button.clicked.connect(partial(self.button_slot, topic_name))
 
-        # Logic to insert the button in the right place
-        current_topics = sorted(self.get_current_topics())
-        current_index = 0
-        for topic in current_topics:
-            if topic > topic_name:
-                self.buttons_list.insert(current_index, button)
-                self.ly_buttons.insertWidget(current_index, button)
-                break
-            if current_index == len(current_topics) - 1:
-                self.buttons_list.append(button)
-                self.ly_buttons.addWidget(button)
-            current_index += 1
+        # Get the insertion point in list
+        ins_point = bisect.bisect_left(self.get_current_topics(), topic_name)
+        self.buttons_list.insert(ins_point, button)
+        self.ly_buttons.insertWidget(ins_point, button)
 
     def remove_topic(self, topic_name):
         """! Remove a topic button from the list.
