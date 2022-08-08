@@ -851,6 +851,7 @@ class RosboardClientGui(QMainWindow):
                 break
         self.client_topics_panel_wg.remove_topic(topic_name)
         self.client_topics_list_wg.insert_topic(topic_name)
+        self.stream_watchlist.append(topic_name)
 
     def move_from_server_panel_to_list(self, topic_name: str):
         """! Add a topic to list widget and remove it from panel if necessary
@@ -866,8 +867,7 @@ class RosboardClientGui(QMainWindow):
             del self.topic_handlers[topic_name]
             self.server_topics_panel_wg.remove_topic(topic_name)
         self.server_topics_list_wg.insert_topic(topic_name)
-        self.stream_watchlist.append(topic_name)
-
+        
     def update_topic_stats_and_state(self):
         """! Update the handled topic statistics and state."""
         topic_stats = {}
