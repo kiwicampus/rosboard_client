@@ -646,16 +646,30 @@ class RosboardClientGui(QMainWindow):
                 if topic not in streamed_topics and topic not in subscribed_topics:
                     client_available_topics.append(topic)
 
-            # Clear the lists
-            self.client_topics_list_wg.clear_list()
-            self.server_topics_list_wg.clear_list()
+            # Get topics present in lists
+            server_topics_list = self.server_topics_list_wg.get_current_topics()
+            client_topics_list = self.client_topics_list_wg.get_current_topics()
 
-            # Populate lists
-            for topic in server_available_topics:
-                self.server_topics_list_wg.add_topic(topic)
+            # Get the difference between lists
+            server_add_topics = list(set(server_available_topics) - set(server_topics_list))
+            server_rm_topics = list(set(server_topics_list) - set(server_available_topics))
+            client_add_topics = list(set(client_available_topics) - set(client_topics_list))
+            client_rm_topics = list(set(client_topics_list) - set(client_available_topics))
 
-            for topic in client_available_topics:
-                self.client_topics_list_wg.add_topic(topic)
+            # Add topics to lists
+            for topic in server_add_topics:
+                self.server_topics_list_wg.insert_topic(topic)
+
+            for topic in client_add_topics:
+                self.client_topics_list_wg.insert_topic(topic)
+
+            # Remove topics from lists
+            for topic in server_rm_topics:
+                self.server_topics_list_wg.remove_topic(topic)
+
+            for topic in client_rm_topics:
+                self.client_topics_list_wg.remove_topic(topic)
+
 
     def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
