@@ -31,7 +31,7 @@ from rosboard_desktop_client.streamers import GenericStreamer
 from rosboard_desktop_client.networking import RosboardClient
 
 
-class RosboardYamlNode(Node):
+class RosboardBenchmark(Node):
 
     URL_RE = "^((?P<scheme>[^:/?#]+):(?=//))?(//)?(((?P<login>[^:]+)(?::(?P<password>[^@]+)?)?@)?(?P<host>[^@/?#:]*)(?::(?P<port>\d+)?)?)?(?P<path>[^?#]*)(\?(?P<query>[^#]*))?"
 
