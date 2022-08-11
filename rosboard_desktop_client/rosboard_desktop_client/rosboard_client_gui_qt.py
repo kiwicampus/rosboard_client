@@ -319,6 +319,9 @@ class RosboardClientGui(QMainWindow):
         self.th_spin = Thread(target=self.spin_node)
         self.th_spin.start()
 
+        # Create a rate to spin the node
+        self.rate = self.node.create_rate(100)
+
         self.reset_network_attributes()
 
         # Main window configurations
@@ -428,8 +431,10 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer_to = topic_upd_timer_to
 
     def spin_node(self):
+        """! Function to spin the ROS node."""
         while not self.stop_threads:
-            rclpy.spin_once(self.node, timeout_sec=0.01)
+            rclpy.spin_once(self.node)
+            self.rate.sleep()
         self.node.destroy_node()
         rclpy.shutdown()
 
@@ -796,7 +801,7 @@ class RosboardClientGui(QMainWindow):
                 self.connection_widget.set_status_label("CONNECTED")
 
             except Exception as e:
-                self.node.get_logger().error(e)
+                self.node.get_logger().error(str(e))
                 self.show_warning_message(
                     "Timeout while connecting",
                     "There was a timeout when trying to connect to server.",
