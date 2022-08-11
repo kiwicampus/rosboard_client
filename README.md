@@ -112,7 +112,8 @@ Run the next steps in the client side:
     - Set the compression algorithm in the `compression` field.
 2. Run the `rosbridge` benchmark script by executing `ros2 run rosboard_desktop_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
 
-**Note:** to run these tests, we used our own `rosbridge` and `roslibpy` forks. These forks correct some issues that are present in the main `rosbridge` repository such as allowing the CBOR and PNG compression for images when using ROS2. We strongly recommend using such forks to run the test. The links to our forks are:
+**Note:** to run these tests, we used our own `rosboard`, `rosbridge` and `roslibpy` forks. In the case of `rosboard`, our forks allow us to fix an issue regarding ROS2 QoS ([PR](https://github.com/dheera/rosboard/pull/104)) and adding the feature of streaming topics from the client to the server. With regard of `rosbridge`, these forks correct some issues that are present in the main `rosbridge` repository such as allowing the CBOR and PNG compression for images when using ROS2. We strongly recommend using such forks to run the test. The links to our forks are:
+- [`rosboard`](https://github.com/kiwicampus/rosboard): our own `rosboard` fork.
 - [`rosbridge_suite`](https://github.com/kiwicampus/rosbridge_suite): use the `cbor_fix` branch when compiling the package.
 - [`roslibpy`](https://github.com/kiwicampus/roslibpy): use the `cbor` branch for CBOR compression and `cbor_png` for PNG compression.
 
