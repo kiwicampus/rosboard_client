@@ -2,6 +2,16 @@
 
 The main objective of this library is to selectively stream ROS topics using websockets from a remote robot to a local machine, allowing to use visualization tools like rviz, rqt, mapviz, etc on live data transmitted over the internet. The library implements a client to use with a [rosboard](https://github.com/kiwicampus/rosboard) server running in the remote robot.
 
+## Dependencies
+This package requires the following dependencies:
+- [`twisted`](https://twisted.org/)
+- [`autobahn`](https://autobahn.readthedocs.io/en/latest/)
+- [`cv2`](https://opencv.org/)
+- [`simplejpeg`](https://pypi.org/project/simplejpeg/)
+- [`numpy`](https://numpy.org/)
+- [`icmplib`](https://pypi.org/project/icmplib/)
+- [`PyQt5`](https://pypi.org/project/PyQt5/)
+
 ## Existing alternatives
 There are already some alternatives that allow to transmit ros data over the internet, however they have some drawbacks 
 
