@@ -17,6 +17,7 @@ import bisect
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from ament_index_python import get_package_prefix
 
 from icmplib import ping, NameLookupError
@@ -314,14 +315,7 @@ class RosboardClientGui(QMainWindow):
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
 
-        # Start a thread to spin the node
-        self.stop_threads = False
-        self.th_spin = Thread(target=self.spin_node)
-        self.th_spin.start()
-
-        # Create a rate to spin the node
-        self.rate = self.node.create_rate(100)
-
+        # Initialize network attributes
         self.reset_network_attributes()
 
         # Main window configurations
@@ -430,13 +424,13 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
         self.topic_upd_timer_to = topic_upd_timer_to
 
-    def spin_node(self):
-        """! Function to spin the ROS node."""
-        while not self.stop_threads:
-            rclpy.spin_once(self.node)
-            self.rate.sleep()
-        self.node.destroy_node()
-        rclpy.shutdown()
+    # def spin_node(self):
+    #     """! Function to spin the ROS node."""
+    #     while not self.stop_threads:
+    #         rclpy.spin_once(self.node)
+    #         self.rate.sleep()
+    #     self.node.destroy_node()
+    #     rclpy.shutdown()
 
     def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
         """! Function for handling the close interface event."""
@@ -1318,8 +1312,16 @@ class TopicsPanelWidget(QWidget):
 
 def main():
     rclpy.init(args=sys.argv)
+
     app = QApplication(sys.argv)
     app.setApplicationName("Rosboard Desktop GUI")
     ui = RosboardClientGui()
+
+    # Spin node
+    executor = MultiThreadedExecutor()
+    spin_thread = Thread(target=rclpy.spin, args=(ui.node, executor))
+    spin_thread.daemon = True
+    spin_thread.start()
+
     ui.showMaximized()
     sys.exit(app.exec())
