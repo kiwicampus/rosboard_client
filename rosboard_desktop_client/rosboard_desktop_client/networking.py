@@ -238,27 +238,37 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self.socket_subscriptions = {}
         self.available_topics = {}
 
-        # Get the port from host
-        try:
-            port = int(host.split(":")[1])
-        except IndexError:
-            self.logger.warn(
-                "No port was passed to rosboard client. Using port 80 as default."
-            )
-            port = 80
-        except ValueError:
-            port = 80
-            self.logger.warn(
-                "Could not parse port passed to rosboard client. Using port 80 as default."
-            )
-
-        # Create socket connection
-        if host.startswith("wss://") or host.startswith("ws://"):
+        # Define the socket URL
+        if host.startswith("ws://"):
             socket_url = host + "/rosboard/v1"
+
+        elif host.startswith("wss://"):
+            socket_url = host + "/rosboard/v1"
+            self.isSecure = True
+
         else:
             self.logger.info(
-                "websocket protocol not provided in host url. falling back to ws:// as default"
+                "Websocket protocol not provided in host url. Falling back to ws:// as default"
             )
+
+            # Get the port from host
+            try:
+                # Get last part of string after split
+                port = int(host.split(":")[-1])
+
+            # If value can not be parsed to int, use port 80
+            except ValueError:
+                port = 80
+                self.logger.warn(
+                    "Could not parse port passed to rosboard client. Using port 80 as default."
+                )
+
+            # Add generic exception to prevent errors
+            except Exception:
+                port = 80
+                self.logger.warn(
+                    "There was an error while trying to get port. Using port 80 as default."
+                )
 
             # Use corresponding protocol to connect to server
             if port == 443:
