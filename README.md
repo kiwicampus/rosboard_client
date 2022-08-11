@@ -34,7 +34,7 @@ This package includes a graphical user interface (GUI) that can be used to conne
 We think of *rosbridge* as the main alternative to *rosboard*. In this context, we want to prove that *rosboard* presents an improved approach to streaming data from a remote device within the context of ROS. To do so, we propose a benchmark of metrics relevant to the streaming process. We must note that we will provide any third party with the capability of executing their own tests. We will benchmark two (2) metrics: latency and download speed.
 
 - *Latency:* we define latency as the time difference between the timestamp of the received message and the current computer time. We must note that there might be difference in the server and client clock that might affect this measurement.
-- *Download speed*: is the measurement of received bytes per second while using rosboard. Keep in mind that this measurement is a system-wide metric. In this context, any additional process using the network interface might contaminate the test.
+- *Bandwidth Usage*: is the measurement of received bytes per second while using rosboard. Keep in mind that this measurement is a system-wide metric. In this context, any additional process using the network interface might contaminate the test.
 
 Two laptops were configured in a Local Area Network (LAN) using a network switch. The network switch was not connected to the internet in order to prevent contaminating the test. The used switch had a bandwidth limit of 100 Mibps. We did the benchmark with a data-intensive topics: a RGB camera streaming. The next table presents the used specifications for the streamed topic:
 
@@ -57,10 +57,10 @@ We did our tests streaming the camera feed from a computer connected to a LAN.
     <tr>
         <th>Streaming Tool</th>
         <th>Avg. Latency [ms]</th>
-        <th>Avg. Download Speed [KiB/s]</th>
+        <th>Avg. Bandwidth Usage [KiB/s]</th>
     </tr>
     <tr>
-        <td>Rosboard</td>
+        <td>Rosboard (JPEG compression)</td>
         <td align="right">96.38</td>
         <td align="right">11010.14</td>
     </tr>
@@ -81,7 +81,7 @@ We did our tests streaming the camera feed from a computer connected to a LAN.
     </tr>
 </table>
 
-A visual representation on the difference between `rosboard` and `rosbridge` can be seen in the following GIFs. These GIFs were recorded in the client side while streaming the color image. You may notice how `rosboard` (left) has less latency than `rosbridge` (right, no compression).
+A visual representation on the difference between `rosboard` and `rosbridge` can be seen in the following GIFs. These GIFs were recorded in the client side while streaming the color image. The streaming visualized using Rviz and captured by recording the screen. This visualization and recording took place in the client ROS network. You may notice how `rosboard` (left) has less latency than `rosbridge` (right, no compression).
 
 <table align="center">
     <tr>
