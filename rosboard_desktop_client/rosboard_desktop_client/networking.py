@@ -149,6 +149,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
     """! Class specifying the rosboard client websocket protocol.
     Inherits from the WebSocketClientProtocol from twisted
     """
+
     # Define a flag to indicate the protocol status
     is_connected = False
 
@@ -217,7 +218,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
 
 
 class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
-    
+
     protocol = RosboardClientProtocol
 
     # Specify the max time between connection attempts on reconnection
@@ -237,6 +238,9 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self.socket_subscriptions = {}
         self.available_topics = {}
 
+        # Get the port from host
+        port = int(host.split(":")[-1])
+
         # Create socket connection
         if host.startswith("wss://") or host.startswith("ws://"):
             socket_url = host + "/rosboard/v1"
@@ -244,10 +248,18 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             self.logger.info(
                 "websocket protocol not provided in host url. falling back to ws:// as default"
             )
-            socket_url = "ws://" + host + "/rosboard/v1"
+
+            # Use corresponding protocol to connect to server
+            if port == 443:
+                socket_url = "wss://" + host + "/rosboard/v1"
+                self.isSecure = True
+            else:
+                socket_url = "ws://" + host + "/rosboard/v1"
+
         WebSocketClientFactory.__init__(self, url=socket_url)
         self.logger.info(f"connecting to {socket_url}")
-        self.connector = connectWS(self, connection_timeout)
+        self.connector = connectWS(self, timeout=connection_timeout)
+
         # protocol object. Set when the socket is ready
         self._proto = None
 
@@ -263,6 +275,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             self.is_connected = True
             if time.time() - connection_request_time > connection_timeout:
                 self.logger.error(f"Connection attempt to {socket_url} timed out")
+                ReconnectingClientFactory.stopTrying(self)
                 raise Exception("Connection timed out")
 
         # Check if rosboard returns the topics available on the server within the timeout
@@ -284,7 +297,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             self.logger.warning("Reactor not started as its already running.")
 
     def stop_reactor(self):
-        """! Function to stop the reactor. Handles the error if the reactor is not running. """
+        """! Function to stop the reactor. Handles the error if the reactor is not running."""
         try:
             reactor.stop()
         except ReactorNotRunning as e:
