@@ -801,6 +801,7 @@ class RosboardClientGui(QMainWindow):
                 self.connection_widget.set_status_label("CONNECTED")
 
             except Exception as e:
+                self.reset_network_attributes()
                 self.node.get_logger().error(str(e))
                 self.show_warning_message(
                     "Timeout while connecting",
