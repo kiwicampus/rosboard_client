@@ -239,7 +239,18 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self.available_topics = {}
 
         # Get the port from host
-        port = int(host.split(":")[-1])
+        try:
+            port = int(host.split(":")[1])
+        except IndexError:
+            self.logger.warn(
+                "No port was passed to rosboard client. Using port 80 as default."
+            )
+            port = 80
+        except ValueError:
+            port = 80
+            self.logger.warn(
+                "Could not parse port passed to rosboard client. Using port 80 as default."
+            )
 
         # Create socket connection
         if host.startswith("wss://") or host.startswith("ws://"):
