@@ -107,7 +107,8 @@ To run the `rosbridge` benchmarking, you need to follow the next steps in the se
 
 Run the next steps in the client side:
 1. Configure the [`rosbridge_config.yaml`](./rosboard_desktop_client/rosboard_desktop_client/benchmarks/rosbridge_config.yaml) file with the topics you want to stream:
-    - Add a topic by setting it as a key in the YAML file.
+    - Configure the URL in the corresponding field in the YAML file.
+    - Add a topic by setting it as a key in the YAML file for the `topics_to_subscribe` entry.
     - Set the message type in the `type` field.
     - Set the compression algorithm in the `compression` field.
 2. Run the `rosbridge` benchmark script by executing `ros2 run rosboard_desktop_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.

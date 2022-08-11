@@ -12,7 +12,8 @@ import os
 from rclpy_message_converter import message_converter
 import copy
 
-sys.path.insert(1, "<path_to_roslibpy>/roslibpy/src")
+# sys.path.insert(1, "<path_to_roslibpy>/roslibpy/src")
+sys.path.insert(1, "/workspace/rover/ros2/src/roslibpy/src")
 import roslibpy
 
 
@@ -23,27 +24,31 @@ def ros2_to_ros1_msg_string(ros2_msg_string: str):
 class RosBridgeClient(Node):
     def __init__(self) -> None:
         """!
-        Class constructor for weather node
+        Class constructor for rosbridge benchmark node
         """
         super().__init__("rosbridge_client_node")
         conf_file_path = yaml.safe_load(
             os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "rosbridge_benchmark.yaml"
+                os.path.dirname(os.path.abspath(__file__)), "rosbridge_config.yaml"
             )
         )
 
+        with open(conf_file_path, "r") as stream:
+            config_file = yaml.safe_load(stream)
+
+        host = "ws://" + config_file["url"]
+        topics_to_subscribe = config_file["topics_to_subscribe"]
+
         self.logger = self.get_logger()
 
-        self.socket_client = roslibpy.Ros(host="ws://192.168.0.1:9090")
+        self.socket_client = roslibpy.Ros(host=host)
+
         self.socket_client.run(5)
         if not self.socket_client.is_connected:
             self.get_logger().error(
                 "Could not connect to server. Make sure rosbridge is running on the robot"
             )
             exit(1)
-
-        with open(conf_file_path, "r") as stream:
-            topics_to_subscribe = yaml.safe_load(stream)
 
         self.ros_publishers_dict = {}
         self.socket_subscribers_dict = {}
