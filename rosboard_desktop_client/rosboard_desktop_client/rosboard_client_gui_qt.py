@@ -340,6 +340,10 @@ class RosboardClientGui(QMainWindow):
         # List to store streamers and client topics
         self.client_topics = []
         self.streamers = []
+
+        # List to store recently removed client to server topics.
+        # This prevents the topics from appearing as being streamed from
+        # the server.
         self.stream_watchlist = []
 
         # Define the top layout (connection + stats)
@@ -881,6 +885,8 @@ class RosboardClientGui(QMainWindow):
                 break
         self.client_topics_panel_wg.remove_topic(topic_name)
         self.client_topics_list_wg.insert_topic(topic_name)
+
+        # Append the removed topic to watchlist
         self.stream_watchlist.append(topic_name)
 
     def move_from_server_panel_to_list(self, topic_name: str):
