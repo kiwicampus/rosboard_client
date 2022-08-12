@@ -47,6 +47,24 @@ QPushButton:disabled {
     background-color: #E69F73;
 }
 
+QCheckBox {
+    background-color: transparent;
+    color: #FFFFFF;
+}
+
+QCheckBox:checked {
+    color: #FFFFFF;
+}
+
+QCheckBox::indicator {
+    border: 1px solid #FFFFFF;
+    background-color: transparent;
+}
+
+QCheckBox::indicator:checked {
+    border: 1px solid #FFFFFF;
+    background-color: #77CC66;
+}
 
 /* Scroll bars */
 QScrollBar:vertical,
@@ -98,6 +116,10 @@ QWidget#TopicsListWidget QPushButton {
 QWidget#TopicsListWidget QPushButton:pressed {
     border-color: rgba(0, 0, 0, 0);
     background-color: #2885E2;
+}
+
+QWidget#TopicWidget {
+    background-color: #1863AD;
 }
 
 QWidget#TopicWidget QLabel {

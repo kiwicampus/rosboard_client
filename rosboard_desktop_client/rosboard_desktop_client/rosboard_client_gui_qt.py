@@ -13,9 +13,11 @@ import os
 import re
 import sys
 from typing import Tuple
+import bisect
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from ament_index_python import get_package_prefix
 
 from icmplib import ping, NameLookupError
@@ -41,8 +43,11 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QMessageBox,
     QSplitter,
+    QCheckBox,
 )
+from PyQt5.QtGui import QIcon, QPixmap
 
+from rosboard_desktop_client.streamers import GenericStreamer
 from rosboard_desktop_client.networking import RosboardClient
 from rosboard_desktop_client.republishers import PublisherManager
 
@@ -121,6 +126,7 @@ class TopicHandler:
         """! Destroy the subscription to the topic."""
         self.node.get_logger().info(f"Closing connection for {self.topic_name}")
         self.client.destroy_socket_subscription(self.topic_name)
+        self.node.destroy_publisher(self.republisher.publisher)
         self.running = False
 
     def define_node_state(self):
@@ -300,42 +306,82 @@ class RosboardClientGui(QMainWindow):
         with open(stylesheet_path, "r") as ss_file:
             self.setStyleSheet(ss_file.read())
 
+        # Set the icon
+        icon_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "resources", "icon.png"
+        )
+        self.setWindowIcon(QIcon(icon_path))
+
         # Start the ROS node
         self.node = Node("rosboard_desktop_gui")
 
-        # Start a thread to spin the node
-        self.stop_threads = False
-        self.th_spin = Thread(target=self.spin_node)
-        self.th_spin.start()
-
+        # Initialize network attributes
         self.reset_network_attributes()
 
         # Main window configurations
         self.setWindowTitle("Rosboard Client GUI")
+        self.setAccessibleName("")
 
         # Initialize custom widgets
         self.connection_widget = ConnectionWidget(self)
-        self.stats_widget = StatsWidget(self)
-        self.topics_list_widget = TopicsListWidget(self, self.add_topic_to_panel)
-        self.topics_panel_widget = TopicsPanelWidget(
-            self, self.add_topic_to_list_remove_from_panel
+        self.stats_widget = StatusWidget(self)
+        self.server_topics_list_wg = TopicsListWidget(self, self.add_topic_to_panel)
+        self.server_topics_panel_wg = TopicsPanelWidget(
+            self, ExtendedTopicWidget, self.move_from_server_panel_to_list
+        )
+        self.client_topics_list_wg = TopicsListWidget(self, self.add_client_to_panel)
+        self.client_topics_panel_wg = TopicsPanelWidget(
+            self, TopicWidget, self.move_from_client_panel_to_list
         )
 
-        # Define the top layout (connection + stats)
-        ly_top = QHBoxLayout()
-        ly_top.addWidget(self.connection_widget, 7)
-        ly_top.addWidget(self.stats_widget, 3)
+        # List to store streamers and client topics
+        self.client_topics = []
+        self.streamers = []
 
-        # Define the bottom layout (topics list + topic stats)
-        splitter_bottom = QSplitter(self)
-        splitter_bottom.splitterMoved.connect(self.configure_topics_panel)
-        splitter_bottom.addWidget(self.topics_list_widget)
-        splitter_bottom.addWidget(self.topics_panel_widget)
+        # List to store recently removed client to server topics.
+        # This prevents the topics from appearing as being streamed from
+        # the server.
+        self.stream_watchlist = []
+
+        # Define the top layout (connection + stats)
+        ly_top = QVBoxLayout()
+        ly_top.addWidget(self.connection_widget)
+        ly_top.addWidget(self.stats_widget)
+
+        # Define the top splitter (topics list + topic stats)
+        self.server_splitter = QSplitter(self)
+        self.server_splitter.splitterMoved.connect(
+            partial(self.configure_panel, self.server_topics_panel_wg)
+        )
+        self.server_splitter.addWidget(self.server_topics_list_wg)
+        self.server_splitter.addWidget(self.server_topics_panel_wg)
+
+        # Define the bottom splitter
+        self.client_splitter = QSplitter(self)
+        self.client_splitter.splitterMoved.connect(
+            partial(self.configure_panel, self.client_topics_panel_wg)
+        )
+        self.client_splitter.addWidget(self.client_topics_list_wg)
+        self.client_splitter.addWidget(self.client_topics_panel_wg)
+
+        # Create checkboxes
+        self.server_cb = QCheckBox("Topics streaming from server")
+        self.server_cb.setChecked(True)
+        self.server_cb.stateChanged.connect(self.toggle_top)
+        self.client_cb = QCheckBox("Topics streaming to server")
+        self.client_cb.setChecked(False)
+        self.client_cb.stateChanged.connect(self.toggle_bottom)
 
         # Define the main layout for window
         ly_main = QVBoxLayout()
         ly_main.addLayout(ly_top, stretch=1)
-        ly_main.addWidget(splitter_bottom, stretch=10)
+        ly_main.addWidget(self.server_cb)
+        ly_main.addWidget(self.server_splitter, stretch=10)
+        ly_main.addWidget(self.client_cb)
+        ly_main.addWidget(self.client_splitter, stretch=10)
+
+        # Configure the bottom splitter to be hidden on default
+        self.client_splitter.hide()
 
         # Define the central widget and set the layout
         wg_main = QWidget(self)
@@ -378,11 +424,13 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
         self.topic_upd_timer_to = topic_upd_timer_to
 
-    def spin_node(self):
-        while not self.stop_threads:
-            rclpy.spin_once(self.node, timeout_sec=0.01)
-        self.node.destroy_node()
-        rclpy.shutdown()
+    # def spin_node(self):
+    #     """! Function to spin the ROS node."""
+    #     while not self.stop_threads:
+    #         rclpy.spin_once(self.node)
+    #         self.rate.sleep()
+    #     self.node.destroy_node()
+    #     rclpy.shutdown()
 
     def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
         """! Function for handling the close interface event."""
@@ -395,32 +443,67 @@ class RosboardClientGui(QMainWindow):
 
     def resizeEvent(self, event: PyQt5.QtGui.QResizeEvent):
         """Update the user interface on resize."""
-        self.configure_topics_panel()
+        self.configure_panel(self.server_topics_panel_wg)
+        self.configure_panel(self.client_topics_panel_wg)
         super().resizeEvent(event)
 
-    def configure_topics_panel(self):
-        """! Configure the topics panel columns.
+    def toggle_top(self):
+        """! Toggle the server (server to client) topic stream widget.
 
-        The topics panel number of columns is adjusted depending on the
-        current size of the user interface. This in turn allows the interface
-        to be responsive depending on its size.
+        This method evaluates the checkbox status of the server widget. If
+        the checkbox is set, the server widget is shown. If the checkbox is
+        not set, the server widget will be hidden.
         """
-        ui_width = self.topics_panel_widget.size().width()
-        if ui_width < 501:
-            self.topics_panel_widget.MAX_COLS = 1
-            self.topics_panel_widget.configure_panel()
-        if ui_width > 500 and ui_width < 701:
-            self.topics_panel_widget.MAX_COLS = 2
-            self.topics_panel_widget.configure_panel()
-        if ui_width > 700 and ui_width < 901:
-            self.topics_panel_widget.MAX_COLS = 3
-            self.topics_panel_widget.configure_panel()
-        if ui_width > 900 and ui_width < 1101:
-            self.topics_panel_widget.MAX_COLS = 4
-            self.topics_panel_widget.configure_panel()
-        if ui_width > 1100 and ui_width < 1301:
-            self.topics_panel_widget.MAX_COLS = 5
-            self.topics_panel_widget.configure_panel()
+        if self.server_cb.isChecked():
+            self.server_splitter.show()
+            self.configure_panel(self.server_topics_panel_wg)
+        else:
+            self.server_splitter.hide()
+
+    def toggle_bottom(self):
+        """! Toggle the client (client to server) topic stream widget.
+
+        This method evaluates the checkbox status of the client widget. If
+        the checkbox is set, the client widget is shown. If the checkbox is
+        not set, the client widget will be hidden.
+        """
+        if self.client_cb.isChecked():
+            self.client_splitter.show()
+            self.configure_panel(self.client_topics_panel_wg)
+        else:
+            self.client_splitter.hide()
+
+    def configure_panel(self, panel):
+        """! Configure a panels columns according to its size.
+
+        This method configures the number of columns in a panel depending
+        on its width. The number of columns configuration is done according
+        to the following breakpoints:
+         - (width < 500): single (1) column.
+         - (500 < width < 700): two (2) columns.
+         - (700 < width < 900): three (3) columns.
+         - (900 < width < 1100): four (4) columns.
+         - (width > 1100): five (5) columns.
+
+        @param panel "" instance of a panel that will be configured depending
+        on its size.
+        """
+        panel_width = panel.size().width()
+        if panel_width < 501:
+            panel.MAX_COLS = 1
+            panel.configure_panel()
+        if panel_width > 500 and panel_width < 701:
+            panel.MAX_COLS = 2
+            panel.configure_panel()
+        if panel_width > 700 and panel_width < 901:
+            panel.MAX_COLS = 3
+            panel.configure_panel()
+        if panel_width > 900 and panel_width < 1101:
+            panel.MAX_COLS = 4
+            panel.configure_panel()
+        if panel_width > 1100 and panel_width < 1301:
+            panel.MAX_COLS = 5
+            panel.configure_panel()
 
     def reset_network_attributes(self):
         """! Reset the network-related attributes of the class."""
@@ -465,8 +548,15 @@ class RosboardClientGui(QMainWindow):
     def restore_interface(self):
         """! Restore the interface after a reconnection."""
         self.node.get_logger().info("Restoring interface after reconnection.")
+
         # Get current topics to restore them later.
-        current_topics = self.topics_panel_widget.get_current_topics()
+        current_topics = self.server_topics_panel_wg.get_current_topics()
+
+        # Remove topics that are being streamed
+        streamed_topics = self.get_current_local_topics()
+        current_topics = [
+            topic for topic in current_topics if topic not in streamed_topics
+        ]
 
         # Delete the topic handlers.
         for topic in list(self.topic_handlers.keys()):
@@ -474,13 +564,13 @@ class RosboardClientGui(QMainWindow):
             del self.topic_handlers[topic]
 
         # Clean the interface
-        self.topics_list_widget.remove_all_topics()
-        self.topics_panel_widget.remove_all_topics()
+        self.server_topics_list_wg.clear_list()
+        self.server_topics_panel_wg.remove_all_topics()
 
         # Configure the interface
         available_topics = self.client.get_available_topics()
         for topic in available_topics:
-            self.topics_list_widget.add_topic(topic)
+            self.server_topics_list_wg.add_topic(topic)
         for topic in current_topics:
             self.add_topic_to_panel(topic)
 
@@ -542,22 +632,67 @@ class RosboardClientGui(QMainWindow):
         # Check if the client is connected to the server
         if self.client.protocol.is_connected:
 
-            # Get the currently available topics
-            current_topics = self.client.get_available_topics()
+            # Get the server and client available topics
+            server_current_topics = self.client.get_available_topics()
+            client_current_topics = self.get_current_local_topics()
 
-            # Remove topics from topic list
-            list_topics = self.topics_list_widget.get_current_topics()
-            for topic in self.available_topics:
-                if topic not in current_topics:
-                    if topic in list_topics:
-                        self.topics_list_widget.remove_topic(topic)
-                    self.available_topics.remove(topic)
+            # Get the topics streamed from server
+            subscribed_topics = self.server_topics_panel_wg.get_current_topics()
+            streamed_topics = self.client_topics_panel_wg.get_current_topics()
 
-            # Add new topics to interface
-            for topic in current_topics:
-                if topic not in self.available_topics:
-                    self.available_topics.append(topic)
-                    self.add_topic_to_list_remove_from_panel(topic)
+            # List to store available topics
+            server_available_topics, client_available_topics = [], []
+
+            # Server available topics
+            server_available_topics = [
+                topic
+                for topic in server_current_topics
+                if topic not in subscribed_topics
+                and topic not in self.stream_watchlist
+                and topic not in streamed_topics
+            ]
+
+            # Clear the watchlist
+            self.stream_watchlist = []
+
+            # Client available topics
+            client_available_topics = [
+                topic
+                for topic in client_current_topics
+                if topic not in streamed_topics and topic not in subscribed_topics
+            ]
+
+            # Get topics present in lists
+            server_topics_list = self.server_topics_list_wg.get_current_topics()
+            client_topics_list = self.client_topics_list_wg.get_current_topics()
+
+            # Get the difference between lists
+            server_add_topics = list(
+                set(server_available_topics) - set(server_topics_list)
+            )
+            server_rm_topics = list(
+                set(server_topics_list) - set(server_available_topics)
+            )
+            client_add_topics = list(
+                set(client_available_topics) - set(client_topics_list)
+            )
+            client_rm_topics = list(
+                set(client_topics_list) - set(client_available_topics)
+            )
+
+            # Add topics to lists
+            for topic in server_add_topics:
+                self.server_topics_list_wg.insert_topic(topic)
+
+            for topic in client_add_topics:
+                self.client_topics_list_wg.insert_topic(topic)
+
+            # Remove topics from lists
+            for topic in server_rm_topics:
+                self.server_topics_list_wg.remove_topic(topic)
+
+            for topic in client_rm_topics:
+                self.client_topics_list_wg.remove_topic(topic)
 
     def process_connection_address(self, address: str) -> Tuple[str, int]:
         """! Process the input address to define a server host/port pair.
@@ -637,7 +772,13 @@ class RosboardClientGui(QMainWindow):
                 self.topic_handlers = {}
                 self.available_topics = self.client.get_available_topics()
                 for topic in self.available_topics:
-                    self.topics_list_widget.add_topic_at_end(topic)
+                    self.server_topics_list_wg.add_topic(topic)
+
+                # Get topics from client and add them to the client topics list
+                self.client_topics = self.get_current_local_topics()
+
+                for topic_name in self.client_topics:
+                    self.client_topics_list_wg.add_topic(topic_name)
 
                 # Start the timers to update topics list, stats and restore interface
                 self.topic_stats_timer.start(250)
@@ -654,6 +795,8 @@ class RosboardClientGui(QMainWindow):
                 self.connection_widget.set_status_label("CONNECTED")
 
             except Exception as e:
+                self.reset_network_attributes()
+                self.node.get_logger().error(str(e))
                 self.show_warning_message(
                     "Timeout while connecting",
                     "There was a timeout when trying to connect to server.",
@@ -680,11 +823,23 @@ class RosboardClientGui(QMainWindow):
         self.reset_network_attributes()
 
         # Restore the interface to the disconnected status
-        self.topics_list_widget.remove_all_topics()
-        self.topics_panel_widget.remove_all_topics()
+        self.server_topics_list_wg.clear_list()
+        self.server_topics_panel_wg.remove_all_topics()
+        self.client_topics_list_wg.clear_list()
+        self.client_topics_panel_wg.remove_all_topics()
         self.connection_widget.toggle_edits(True)
         self.connection_widget.set_buttons_status(self.is_connected)
         self.connection_widget.set_status_label("DISCONNECTED")
+
+    def get_current_local_topics(self) -> list:
+        """! Function to get available topics from client side.
+        @return "list" topic names available in the client.
+        """
+        current_topics = []
+        for topic in self.node.get_topic_names_and_types():
+            if len(self.node.get_publishers_info_by_topic(topic[0])) > 0:
+                current_topics.append(topic[0])
+        return current_topics
 
     def add_topic_to_panel(self, topic_name: str):
         """! Add a topic to the topics panel widget and create its handler.
@@ -699,18 +854,42 @@ class RosboardClientGui(QMainWindow):
             self.topic_handlers[topic_name] = TopicHandler(
                 topic_name, self.client, self.node
             )
-            self.topics_list_widget.remove_topic(topic_name)
-            self.topics_panel_widget.add_topic(topic_name)
+            self.server_topics_list_wg.remove_topic(topic_name)
+            self.server_topics_panel_wg.add_topic(topic_name)
         except ModuleNotFoundError as e:
             self.show_warning_message(
                 "Can not load message!", "Can not load topic message type!"
             )
         except Exception as e:
+            self.server_topics_list_wg.remove_topic(topic_name)
             self.node.get_logger().warning(
                 "Attempted to subscribe to unavailable topic!"
             )
 
-    def add_topic_to_list_remove_from_panel(self, topic_name: str):
+    def add_client_to_panel(self, topic_name: str):
+        """! Create a topic streamer and add it to panel.
+        @param topic_name "str" name of the topic that will be streamed.
+        """
+        self.streamers.append(GenericStreamer(self.node, self.client, topic_name))
+        self.client_topics_panel_wg.add_topic(topic_name)
+        self.client_topics_list_wg.remove_topic(topic_name)
+
+    def move_from_client_panel_to_list(self, topic_name: str):
+        """! Stop streaming topic and add it to list.
+        @param topic_name "str" name of the topic that will stop streaming.
+        """
+        for current_index in range(len(self.streamers)):
+            if self.streamers[current_index].topic_name == topic_name:
+                topic_streamer = self.streamers.pop(current_index)
+                topic_streamer.destroy_subscription()
+                break
+        self.client_topics_panel_wg.remove_topic(topic_name)
+        self.client_topics_list_wg.insert_topic(topic_name)
+
+        # Append the removed topic to watchlist
+        self.stream_watchlist.append(topic_name)
+
+    def move_from_server_panel_to_list(self, topic_name: str):
         """! Add a topic to list widget and remove it from panel if necessary
 
         Calling this method will add a given topic to the topics list in
@@ -722,8 +901,8 @@ class RosboardClientGui(QMainWindow):
         if topic_name in self.topic_handlers.keys():
             self.topic_handlers[topic_name].destroy_subscription()
             del self.topic_handlers[topic_name]
-            self.topics_panel_widget.remove_topic(topic_name)
-        self.topics_list_widget.add_topic(topic_name)
+            self.server_topics_panel_wg.remove_topic(topic_name)
+        self.server_topics_list_wg.insert_topic(topic_name)
 
     def update_topic_stats_and_state(self):
         """! Update the handled topic statistics and state."""
@@ -732,8 +911,8 @@ class RosboardClientGui(QMainWindow):
         for topic in self.topic_handlers.keys():
             topic_stats[topic] = self.topic_handlers[topic].get_topic_stats()
             topic_state[topic] = self.topic_handlers[topic].state
-        self.topics_panel_widget.update_topic_stats(topic_stats)
-        self.topics_panel_widget.update_topic_state(topic_state)
+        self.server_topics_panel_wg.update_topic_stats(topic_stats)
+        self.server_topics_panel_wg.update_topic_state(topic_state)
 
 
 class ConnectionWidget(QWidget):
@@ -780,12 +959,10 @@ class ConnectionWidget(QWidget):
         ly_widget = QGridLayout()
         ly_widget.setSpacing(0)
         ly_widget.setContentsMargins(0, 0, 0, 0)
-        ly_widget.addWidget(QLabel("ADDRESS:"), 0, 0, 1, 2, Qt.AlignCenter)
-        ly_widget.addWidget(self.address_le, 1, 0, 1, 2)
-        ly_widget.addWidget(self.connect_bt, 2, 0)
-        ly_widget.addWidget(self.disconnect_bt, 2, 1)
-        ly_widget.addWidget(self.status_lb, 3, 0, 1, 2, Qt.AlignCenter)
-
+        ly_widget.addWidget(self.address_le, 0, 0, 1, 2)
+        ly_widget.addWidget(self.connect_bt, 1, 0)
+        ly_widget.addWidget(self.disconnect_bt, 1, 1)
+        ly_widget.addWidget(self.status_lb, 2, 0, 1, 2, Qt.AlignCenter)
         self.setLayout(ly_widget)
 
     def get_connection_address(self) -> str:
@@ -821,7 +998,7 @@ class ConnectionWidget(QWidget):
         self.setStyleSheet(ConnectionWidget.CONN_STATUS_DICT[status])
 
 
-class StatsWidget(QWidget):
+class StatusWidget(QWidget):
     def __init__(self, parent: RosboardClientGui):
         """! Widget to present global statistics in the user interface.
 
@@ -836,15 +1013,18 @@ class StatsWidget(QWidget):
         super(QWidget, self).__init__(parent)
 
         # Define the labels to store the stats. values.
-        self.cpu_usage_lb = QLabel("CPU USAGE: XXX.XX \t \t %")
-        self.roundtrip_lb = QLabel("ROUNDTRIP: XXX.XX \t \t ms")
-        self.download_lb = QLabel("DOWNLOAD: XXX.XX \t \t kbps")
+        self.cpu_usage_lb = QLabel("XXX.XX %")
+        self.roundtrip_lb = QLabel("XXX.XX ms")
+        self.download_lb = QLabel("XXXX.X kbps")
 
         # Define the widget layout
         ly_widget = QGridLayout()
-        ly_widget.addWidget(self.cpu_usage_lb, 0, 0)
-        ly_widget.addWidget(self.roundtrip_lb, 1, 0)
-        ly_widget.addWidget(self.download_lb, 2, 0)
+        ly_widget.addWidget(QLabel("CPU USAGE [%]"), 0, 0, Qt.AlignCenter)
+        ly_widget.addWidget(QLabel("ROUNDTRIP [ms]"), 0, 1, Qt.AlignCenter)
+        ly_widget.addWidget(QLabel("DOWNLOAD SPEED [kbps]"), 0, 2, Qt.AlignCenter)
+        ly_widget.addWidget(self.cpu_usage_lb, 1, 0, Qt.AlignCenter)
+        ly_widget.addWidget(self.roundtrip_lb, 1, 1, Qt.AlignCenter)
+        ly_widget.addWidget(self.download_lb, 1, 2, Qt.AlignCenter)
         self.setLayout(ly_widget)
 
     def update_stats_widget(self, cpu_usage: float, roundtrip: float, download: float):
@@ -854,104 +1034,175 @@ class StatsWidget(QWidget):
         @param roundtrip "float" value that represents the network delay.
         @param download "float" value that represents the download speed.
         """
-        self.cpu_usage_lb.setText(f"CPU USAGE: {cpu_usage:3.2f} %")
-        self.roundtrip_lb.setText(f"ROUNDTRIP: {roundtrip:3.2f} ms")
-        self.download_lb.setText(f"DOWNLOAD: {download:4.1f} kbps")
+        self.cpu_usage_lb.setText(f"{cpu_usage:3.2f} %")
+        self.roundtrip_lb.setText(f"{roundtrip:3.2f} ms")
+        self.download_lb.setText(f"{download:4.1f} kbps")
 
 
 class TopicsListWidget(QWidget):
-    def __init__(self, parent: RosboardClientGui, click_slot: callable):
-        """! Widget to show the available topics from the server in a list.
+    def __init__(self, parent: RosboardClientGui, button_click_handler: callable):
+        """! Widget to show a topics list and manage its behavior.
 
-        This widget contains the list of available topics in the server. The
-        topics are presented in the interface as a vertical list of buttons. As
-        one of these buttons is pressed, the interface will handle the interface
-        and the topic will be published in the client side.
+        This class includes the logic to handle a topics list. The logic
+        allows to add and remove buttons. Buttons can be added at the end of
+        the list ('add_topic') or inserted to match an alphabetical order
+        ('insert_topic'). Removing a specific button ('') is possible as
+        clearing the whole list (). When a button is pressed, the widget will
+        route the slot into a callable object that is passed in the
+        constructor.
 
-        @param parent "RosboardClientGui" establish the parent class of the
-        widget.
-        @param click_slot "callable" function that is called when an element
-        from the list is clicked.
+        @params parent "RosboardClientGui" set the parent class of the
+        widget to call methods.
+        @params button_click_handler "callable" get the callable function that
+        is executed when a button from the list is pressed. The callable must
+        have a parameter related to the topic name.
         """
-        super(QWidget, self).__init__(parent)
+        super(TopicsListWidget, self).__init__(parent)
         self.setObjectName("TopicsListWidget")
         self.setMinimumWidth(300)
 
-        # Store the clicked slot
-        self.click_slot = click_slot
+        # Store the callable object
+        self.button_slot = button_click_handler
 
-        # List to store the button widgets.
-        self.topic_btns = []
+        # List to store the button objects
+        self.buttons_list = []
 
-        self.ly_topics = QVBoxLayout()
-        self.ly_topics.setAlignment(Qt.AlignTop)
+        # Create the layout to add the buttons
+        self.ly_buttons = QVBoxLayout()
+        self.ly_buttons.setAlignment(Qt.AlignTop)
 
-        # Create the group of topic buttons
-        self.topics_gb = QGroupBox()
-        self.topics_gb.setObjectName("topics_gb")
-        self.topics_gb.setLayout(self.ly_topics)
-        self.topics_gb.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
+        # Create the group box to handle the buttons layout
+        gb_buttons = QGroupBox()
+        gb_buttons.setObjectName("topics_gb")
+        gb_buttons.setLayout(self.ly_buttons)
+        gb_buttons.setStyleSheet("QGroupBox#topics_gb{border: 1px solid black;}")
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(self.topics_gb)
-        scroll_area.setWidgetResizable(True)
+        # Create the scroll area for the buttons
+        sa_buttons = QScrollArea()
+        sa_buttons.setWidget(gb_buttons)
+        sa_buttons.setWidgetResizable(True)
 
-        ly_main = QVBoxLayout(self)
-        ly_main.addWidget(scroll_area)
+        # Create the main layout to add the scroll area
+        ly_main = QVBoxLayout()
+        ly_main.addWidget(sa_buttons)
         self.setLayout(ly_main)
 
-    def add_topic(self, topic_name: str):
-        """! Insert a topic to the list in alphabetic order.
-        @param topic_name "str" name of the topic that will be linked to the button.
-        """
-        # Add topic to list and get index
-        current_topics = [bt.text() for bt in self.topic_btns]
-        current_topics.append(topic_name)
-        current_topics = sorted(current_topics)
-        topic_indx = current_topics.index(topic_name)
-
-        # Insert the button into widget
-        bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(
-            # Call add_topic_to_panel in RosboardClientGui
-            partial(self.click_slot, topic_name)
-        )
-        self.topic_btns.insert(topic_indx + 1, bt_topic)
-        self.ly_topics.insertWidget(topic_indx, bt_topic)
-
-    def add_topic_at_end(self, topic_name: str):
+    def add_topic(self, topic_name):
         """! Add a button to the at the end of the topic list.
         @param topic_name "str" name of the topic that will be linked to the button.
         """
         bt_topic = QPushButton(topic_name)
-        bt_topic.clicked.connect(partial(self.click_slot, topic_name))
-        self.topic_btns.append(bt_topic)
-        self.ly_topics.addWidget(self.topic_btns[-1])
+        bt_topic.clicked.connect(partial(self.button_slot, topic_name))
+        self.buttons_list.append(bt_topic)
+        self.ly_buttons.addWidget(bt_topic)
 
-    def remove_topic(self, topic_name: str):
+    def insert_topic(self, topic_name):
+        """! Insert a topic to the list in alphabetic order.
+        @param topic_name "str" name of the topic that will be linked to the button.
+        """
+        # Create the button
+        button = QPushButton(topic_name)
+        button.clicked.connect(partial(self.button_slot, topic_name))
+
+        # Get the insertion point in list
+        ins_point = bisect.bisect_left(self.get_current_topics(), topic_name)
+        self.buttons_list.insert(ins_point, button)
+        self.ly_buttons.insertWidget(ins_point, button)
+
+    def remove_topic(self, topic_name):
         """! Remove a topic button from the list.
         @param topic_name "str" name of the topic whose button will be removed.
         """
-        for button in self.topic_btns:
+        for button in self.buttons_list:
             if button.text() == topic_name:
-                self.topic_btns.remove(button)
+                self.buttons_list.remove(button)
                 button.deleteLater()
+                break
 
-    def remove_all_topics(self):
-        """! Remove all topics from widget."""
-        topic_names = [btn.text() for btn in self.topic_btns]
-        for tn in topic_names:
-            self.remove_topic(tn)
+    def clear_list(self):
+        """! Remove every button present in the list."""
+        for button in self.buttons_list:
+            button.deleteLater()
+        self.buttons_list = []
 
     def get_current_topics(self) -> list:
-        """!
-        Return the current topics in widget.
+        """! Return the current topic names in the widget."""
+        return [bt.text() for bt in self.buttons_list]
+
+
+class TopicWidget(QWidget):
+    def __init__(self, parent, topic_name: str, close_slot: callable):
+        """!"""
+        super(QWidget, self).__init__(parent)
+        self.setObjectName("TopicWidget")
+        self.setAttribute(Qt.WA_StyledBackground)
+
+        # Store the topic name as class attribute
+        self.topic_name = topic_name
+
+        # Add the close button and connect its slot to parameter
+        bt_close = QPushButton("x")
+        bt_close.clicked.connect(partial(close_slot, self.topic_name))
+
+        lb_name = QLabel(self.topic_name)
+        lb_name.setObjectName("TopicName")
+
+        ly_top = QHBoxLayout()
+        ly_top.setSpacing(5)
+        ly_top.setContentsMargins(0, 0, 0, 0)
+        ly_top.addWidget(lb_name, stretch=100)
+        ly_top.addWidget(bt_close, stretch=1, alignment=Qt.AlignRight)
+
+        self.ly_widget = QGridLayout()
+        self.ly_widget.setSpacing(0)
+        self.ly_widget.addLayout(ly_top, 0, 0, 1, 2)
+        self.setLayout(self.ly_widget)
+
+
+class ExtendedTopicWidget(TopicWidget):
+
+    # Dictionary that maps the topic state to a widget background color.
+    TOPIC_STATE_DICT = {
+        "DELAY": "QWidget#TopicWidget{background-color: #FF6666;}",
+        "NORMAL": "QWidget#TopicWidget{background-color: #77CC66;}",
+        "NO_DATA": "QWidget#TopicWidget{background-color: #B0B0B0;}",
+    }
+
+    def __init__(self, parent, topic_name: str, close_slot: callable):
+        """!"""
+        super(ExtendedTopicWidget, self).__init__(parent, topic_name, close_slot)
+
+        self.freq_lb = QLabel("XXX.XX")
+        self.latency_lb = QLabel("XXX.XX")
+
+        self.ly_widget.addWidget(QLabel("Freq. [Hz]:"), 1, 0)
+        self.ly_widget.addWidget(QLabel("DT [ms]:"), 2, 0)
+        self.ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
+        self.ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
+
+    def update_topic_stats(self, frequency: float, latency: float):
+        """! Update the topic statistics: frequency and latency.
+        @param frequency "float" value.
+        @param latency "float" value. Might be 'None' to indicate latency is not present.
+        latency calculations or not.
         """
-        return [btn.text() for btn in self.topic_btns]
+        has_latency = latency is not None
+        self.freq_lb.setText(f"{frequency:3.2f}")
+        if has_latency:
+            self.latency_lb.setText(f"{latency * 1000:3.2f}")
+        else:
+            self.latency_lb.setText("N/A")
+
+    def update_topic_state(self, state: str):
+        """!
+        Update the node element color depending on topic state.
+        @param state "str" represent the received messages values for topic.
+        """
+        self.setStyleSheet(ExtendedTopicWidget.TOPIC_STATE_DICT[state])
 
 
 class TopicsPanelWidget(QWidget):
-    def __init__(self, parent: RosboardClientGui, close_slot: callable):
+    def __init__(self, parent: RosboardClientGui, widget, close_slot: callable):
         """! Widget that contains handled topic widgets.
 
         This widget contains the topics widgets associated to the handled topics.
@@ -962,14 +1213,18 @@ class TopicsPanelWidget(QWidget):
 
         @param parent "RosboardClientGui" establish the parent class of the
         widget.
-        @param close_slot "callable" function that is called from the panel
-        widgets when their close button is pressed.
+        @param widget "QWidget" widget that will be added to the panel. The
+        widget must have two parameters fields: a string related to the
+        topics name and a callable that is called when the topic is closed.
+        @Param close_slot "callable" function that is called when the widget
+        is closed.
         """
         super(QWidget, self).__init__(parent)
         self.setObjectName("TopicsPanelWidget")
         self.setMinimumWidth(300)
 
-        # Store the close slot function
+        # Store the passed parameters
+        self.widget_class = widget
         self.close_slot = close_slot
 
         # Define attributes for max. columns
@@ -997,17 +1252,17 @@ class TopicsPanelWidget(QWidget):
         self.widgets_list = []
 
     def add_topic(self, topic_name: str):
-        """!
-        Add topic to panel and configure the layout.
+        """! Add topic to panel and configure the layout.
         @param topic_name "str" name of the topic that will be added.
         """
-        topic_wg = TopicWidget(self, topic_name, self.close_slot)
-        self.widgets_list.append(topic_wg)
+        topic_widget = self.widget_class(
+            self, topic_name=topic_name, close_slot=self.close_slot
+        )
+        self.widgets_list.append(topic_widget)
         self.configure_panel()
 
     def remove_topic(self, topic_name: str):
-        """!
-        Removes a topic from the panel and configure the layout.
+        """! Remove a topic from the panel and configure the layout.
         @param topic_name "str" name of the topic that will be removed.
         """
         for topic_wg in self.widgets_list:
@@ -1055,84 +1310,18 @@ class TopicsPanelWidget(QWidget):
         return [topic_wg.topic_name for topic_wg in self.widgets_list]
 
 
-class TopicWidget(QWidget):
-
-    # Dictionary that maps the topic state to a widget background color.
-    TOPIC_STATE_DICT = {
-        "DELAY": "QWidget#TopicWidget{background-color: #FF6666;}",
-        "NORMAL": "QWidget#TopicWidget{background-color: #77CC66;}",
-        "NO_DATA": "QWidget#TopicWidget{background-color: #B0B0B0;}",
-    }
-
-    def __init__(
-        self, parent: TopicsPanelWidget, topic_name: str, close_slot: callable
-    ):
-        """! Widget to present the handled topic name and statistics.
-
-        The widget includes the topic name, received frequency and time delay.
-        A close button will remove the topic widget and close the handling of
-        the connection.
-
-        @param parent "TopicsPanelWidget" parent widget of this widget.
-        @param topic_name "str" name of the topic this widget is associated to.
-        @param close_slot "callable" slot function that is called when the close
-        button is clicked.
-        """
-        super(QWidget, self).__init__(parent)
-        self.setObjectName("TopicWidget")
-        self.setAttribute(Qt.WA_StyledBackground)
-
-        self.topic_name = topic_name
-
-        bt_close = QPushButton("X")
-        bt_close.clicked.connect(partial(close_slot, self.topic_name))
-
-        lb_name = QLabel(self.topic_name)
-        lb_name.setObjectName("TopicName")
-
-        ly_top = QHBoxLayout()
-        ly_top.setSpacing(5)
-        ly_top.setContentsMargins(0, 0, 0, 0)
-        ly_top.addWidget(lb_name, stretch=100)
-        ly_top.addWidget(bt_close, stretch=1, alignment=Qt.AlignRight)
-
-        self.freq_lb = QLabel("XXX.XX")
-        self.latency_lb = QLabel("XXX.XX")
-
-        ly_widget = QGridLayout()
-        ly_widget.setSpacing(0)
-        ly_widget.addLayout(ly_top, 0, 0, 1, 2)
-        ly_widget.addWidget(QLabel("Freq. [Hz]:"), 1, 0)
-        ly_widget.addWidget(QLabel("DT [ms]:"), 2, 0)
-        ly_widget.addWidget(self.freq_lb, 1, 1, Qt.AlignRight)
-        ly_widget.addWidget(self.latency_lb, 2, 1, Qt.AlignRight)
-        self.setLayout(ly_widget)
-
-    def update_topic_stats(self, frequency: float, latency: float):
-        """!
-        Update the topic statistics: frequency and latency.
-        @param frequency "float" value.
-        @param latency "float" value. Might be 'None' to indicate latency is not present.
-        latency calculations or not.
-        """
-        has_latency = latency is not None
-        self.freq_lb.setText(f"{frequency:3.2f}")
-        if has_latency:
-            self.latency_lb.setText(f"{latency * 1000:3.2f}")
-        else:
-            self.latency_lb.setText("N/A")
-
-    def update_topic_state(self, state: str):
-        """!
-        Update the node element color depending on topic state.
-        @param state "str" represent the received messages values for topic.
-        """
-        self.setStyleSheet(TopicWidget.TOPIC_STATE_DICT[state])
-
-
 def main():
     rclpy.init(args=sys.argv)
+
     app = QApplication(sys.argv)
+    app.setApplicationName("Rosboard Desktop GUI")
     ui = RosboardClientGui()
+
+    # Spin node
+    executor = MultiThreadedExecutor()
+    spin_thread = Thread(target=rclpy.spin, args=(ui.node, executor))
+    spin_thread.daemon = True
+    spin_thread.start()
+
     ui.showMaximized()
     sys.exit(app.exec())

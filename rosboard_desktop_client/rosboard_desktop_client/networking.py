@@ -81,6 +81,7 @@ class WebsocketV1Transport:
     MSG_SUB = "s"
     MSG_SYSTEM = "y"
     MSG_UNSUB = "u"
+    MSG_UNPUB = "n"
     PING_SEQ = "s"
     PONG_SEQ = "s"
     PONG_TIME = "t"
@@ -148,6 +149,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
     """! Class specifying the rosboard client websocket protocol.
     Inherits from the WebSocketClientProtocol from twisted
     """
+
     # Define a flag to indicate the protocol status
     is_connected = False
 
@@ -216,7 +218,7 @@ class RosboardClientProtocol(WebSocketClientProtocol):
 
 
 class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
-    
+
     protocol = RosboardClientProtocol
 
     # Specify the max time between connection attempts on reconnection
@@ -236,17 +238,49 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self.socket_subscriptions = {}
         self.available_topics = {}
 
-        # Create socket connection
-        if host.startswith("wss://") or host.startswith("ws://"):
+        # Define the socket URL
+        if host.startswith("ws://"):
             socket_url = host + "/rosboard/v1"
+
+        elif host.startswith("wss://"):
+            socket_url = host + "/rosboard/v1"
+            self.isSecure = True
+
         else:
             self.logger.info(
-                "websocket protocol not provided in host url. falling back to ws:// as default"
+                "Websocket protocol not provided in host url. Falling back to ws:// as default"
             )
-            socket_url = "ws://" + host + "/rosboard/v1"
+
+            # Get the port from host
+            try:
+                # Get last part of string after split
+                port = int(host.split(":")[-1])
+
+            # If value can not be parsed to int, use port 80
+            except ValueError:
+                port = 80
+                self.logger.warn(
+                    "Could not parse port passed to rosboard client. Using port 80 as default."
+                )
+
+            # Add generic exception to prevent errors
+            except Exception:
+                port = 80
+                self.logger.warn(
+                    "There was an error while trying to get port. Using port 80 as default."
+                )
+
+            # Use corresponding protocol to connect to server
+            if port == 443:
+                socket_url = "wss://" + host + "/rosboard/v1"
+                self.isSecure = True
+            else:
+                socket_url = "ws://" + host + "/rosboard/v1"
+
         WebSocketClientFactory.__init__(self, url=socket_url)
         self.logger.info(f"connecting to {socket_url}")
-        self.connector = connectWS(self, connection_timeout)
+        self.connector = connectWS(self, timeout=connection_timeout)
+
         # protocol object. Set when the socket is ready
         self._proto = None
 
@@ -262,6 +296,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             self.is_connected = True
             if time.time() - connection_request_time > connection_timeout:
                 self.logger.error(f"Connection attempt to {socket_url} timed out")
+                ReconnectingClientFactory.stopTrying(self)
                 raise Exception("Connection timed out")
 
         # Check if rosboard returns the topics available on the server within the timeout
@@ -283,7 +318,7 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             self.logger.warning("Reactor not started as its already running.")
 
     def stop_reactor(self):
-        """! Function to stop the reactor. Handles the error if the reactor is not running. """
+        """! Function to stop the reactor. Handles the error if the reactor is not running."""
         try:
             reactor.stop()
         except ReactorNotRunning as e:
@@ -322,6 +357,19 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             # rosboard expects a message like this" ["u", {topicName: xxx}] to destroy the subscription
             json.dumps(
                 [WebsocketV1Transport.MSG_UNSUB, {"topicName": topic_name}]
+            ).encode("utf-8"),
+        )
+
+    def destroy_socket_publisher(self, topic_name: str):
+        """! Function to destroy publisher of a topic in server.
+        @param topic_name "str" name of the topic publisher that will be destroyed.
+        """
+        self.logger.info(f"Destroying publisher for topic {topic_name}")
+        # Send message to destroy publisher in server. Message is expected to be: ["n", {topicName: xxxx}]
+        self._proto.send_message(
+            #
+            json.dumps(
+                [WebsocketV1Transport().MSG_UNPUB, {"topicName": topic_name}]
             ).encode("utf-8"),
         )
 

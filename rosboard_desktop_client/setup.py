@@ -21,6 +21,8 @@ setup(
         "console_scripts": [
             "rosboard_client = rosboard_desktop_client.rosboard_client:main",
             "rosboard_client_gui = rosboard_desktop_client.rosboard_client_gui_qt:main",
+            "rosboard_benchmark = rosboard_desktop_client.benchmarks.rosboard_benchmark:main",
+            "rosbridge_benchmark = rosboard_desktop_client.benchmarks.rosbridge_benchmark:main",
         ],
     },
 )

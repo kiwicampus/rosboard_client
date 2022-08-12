@@ -1,0 +1,11 @@
+# URL: set the server URL and port here.
+url: 192.168.0.1:8888
+# Set the topics you want to stream FROM the server here
+topics:
+  [
+    /camera/color/image_raw,
+  ]
+# Set the topics you want to stream TO the server here
+topics_to_stream:
+  []
+  
