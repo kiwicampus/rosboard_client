@@ -47,9 +47,9 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QPixmap
 
-from rosboard_desktop_client.streamers import GenericStreamer
-from rosboard_desktop_client.networking import RosboardClient
-from rosboard_desktop_client.republishers import PublisherManager
+from rosboard_client.streamers import GenericStreamer
+from rosboard_client.networking import RosboardClient
+from rosboard_client.republishers import PublisherManager
 
 
 class TopicHandler:
