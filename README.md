@@ -37,7 +37,7 @@ The url that ngrok provides can be used as host for creating the rosboard client
 ## Rosboard GUI
 This package includes a graphical user interface (GUI) that can be used to connect the local computer (client) to the server. The GUI allows an user to define which topics will be streamed from the server to the client and viceversa. In addition to such capability, the interface presents information related to the rate in which the topic messages are received and the latency of them i.e. the time difference between the message header stamp and the current system time. Finally, some general metrics are presented regarding the CPU usage, average roundtrip time (RTT), and current download speed. This application is intended to ease the streaming process while being capable of dynamically selecting which topics are streamed.
 
-<p align="center"><img src="https://user-images.githubusercontent.com/14006555/183146092-0c4fd61f-8222-4fdb-baa7-5f38cecb30a2.png" alt="rosboard-gui" width=800></p>
+<p align="center"><img src="https://user-images.githubusercontent.com/14006555/184432712-2b108dcc-fff3-4ec1-b229-d6f71c3dc1f6.png" alt="rosboard-gui" width=800></p>
 
 
 ## Comparison with Rosbridge
@@ -56,7 +56,7 @@ Two laptops were configured in a Local Area Network (LAN) using a network switch
     </tr>
     <tr>
         <td>RGB Camera</th>
-        <td>360 x 640</th>
+        <td>640 x 360</th>
         <td>15</th>
     </tr>
 </table>
