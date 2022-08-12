@@ -3,7 +3,7 @@
 # Rosboard Desktop Client
 This package is a graphical user interface (GUI) to be used with the rosboard utility. The graphical interface allows an user to subscribe to topics that are available in the server and stream topics to the server. By using an user interface it is possible to dynamically configure which topics will be streamed to and from the server. This guide will introduce the interface along with its functionalities. The GUI is presented in the next image. This shows how the GUI would look under normal operations. The interface is composed of four main widgets: the connection widget, the statistics widget, the server-available widget and the client-available widget.
 
-<p align="center"><img src="https://user-images.githubusercontent.com/14006555/183146092-0c4fd61f-8222-4fdb-baa7-5f38cecb30a2.png" alt="rosboard-gui" width=800></p>
+<p align="center"><img src="https://user-images.githubusercontent.com/14006555/184369411-8a754079-2f7b-4220-bc02-a5a924f95c8d.png" alt="rosboard-gui" width=800></p>
 
 ## Connection Widget
 The connection widget allows an user to manage the connection from the GUI to the server. It is expected for the user to input the server address in the line editor and then click the "CONNECT" button to establish the connection to the server. A feedback is presented in the widget and it shows the connection status. Such status can have three status: "CONNECTED", "DISCONNECTED" and "RETRYING". The "RETYING" status is used when the connection to the server is lost and the interface is attempting to regain such connection. Clicking the "DISCONNECT" button will close the connection to the server.
