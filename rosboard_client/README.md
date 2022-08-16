@@ -1,6 +1,6 @@
 <img src="https://user-images.githubusercontent.com/43115782/167684386-91cc219e-c499-4f5d-8895-2b292f887563.png" alt="kiwi_banner" width="1200">
 
-# Rosboard Desktop Client
+# Rosboard Client
 This package is a graphical user interface (GUI) to be used with the rosboard utility. The graphical interface allows an user to subscribe to topics that are available in the server and stream topics to the server. By using an user interface it is possible to dynamically configure which topics will be streamed to and from the server. This guide will introduce the interface along with its functionalities. The GUI is presented in the next image. This shows how the GUI would look under normal operations. The interface is composed of four main widgets: the connection widget, the statistics widget, the server-available widget and the client-available widget.
 
 <p align="center"><img src="https://user-images.githubusercontent.com/14006555/184432712-2b108dcc-fff3-4ec1-b229-d6f71c3dc1f6.png" alt="rosboard-gui" width=800></p>

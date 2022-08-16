@@ -1314,7 +1314,7 @@ def main():
     rclpy.init(args=sys.argv)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Rosboard Desktop GUI")
+    app.setApplicationName("Rosboard Client GUI")
     ui = RosboardClientGui()
 
     # Spin node

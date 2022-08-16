@@ -1,5 +1,4 @@
-# Rosboard Desktop Client
-
+# Rosboard Client
 The main objective of this library is to selectively stream ROS topics using websockets from a remote robot to a local machine, allowing to use visualization tools like rviz, rqt, mapviz, etc on live data transmitted over the internet. The library implements a client to use with a [rosboard](https://github.com/kiwicampus/rosboard) server running in the remote robot.
 
 ## Dependencies
