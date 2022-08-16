@@ -347,6 +347,7 @@ class RosboardClientGui(QMainWindow):
         ly_top = QVBoxLayout()
         ly_top.addWidget(self.connection_widget)
         ly_top.addWidget(self.stats_widget)
+        ly_top.setAlignment(Qt.AlignTop)
 
         # Define the top splitter (topics list + topic stats)
         self.server_splitter = QSplitter(self)
@@ -372,6 +373,10 @@ class RosboardClientGui(QMainWindow):
         self.client_cb.setChecked(False)
         self.client_cb.stateChanged.connect(self.toggle_bottom)
 
+        # Create notice label
+        lb_notice = QLabel("@2022, Kiwibot, Inc. or its Affiliates, Ai&Robotics")
+        lb_notice.setAlignment(Qt.AlignCenter)
+
         # Define the main layout for window
         ly_main = QVBoxLayout()
         ly_main.addLayout(ly_top, stretch=1)
@@ -379,6 +384,7 @@ class RosboardClientGui(QMainWindow):
         ly_main.addWidget(self.server_splitter, stretch=10)
         ly_main.addWidget(self.client_cb)
         ly_main.addWidget(self.client_splitter, stretch=10)
+        ly_main.addWidget(lb_notice)
 
         # Configure the bottom splitter to be hidden on default
         self.client_splitter.hide()
@@ -423,14 +429,6 @@ class RosboardClientGui(QMainWindow):
         self.topic_upd_timer = QTimer(self)
         self.topic_upd_timer.timeout.connect(self.update_available_topics)
         self.topic_upd_timer_to = topic_upd_timer_to
-
-    # def spin_node(self):
-    #     """! Function to spin the ROS node."""
-    #     while not self.stop_threads:
-    #         rclpy.spin_once(self.node)
-    #         self.rate.sleep()
-    #     self.node.destroy_node()
-    #     rclpy.shutdown()
 
     def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
         """! Function for handling the close interface event."""
@@ -550,29 +548,40 @@ class RosboardClientGui(QMainWindow):
         self.node.get_logger().info("Restoring interface after reconnection.")
 
         # Get current topics to restore them later.
-        current_topics = self.server_topics_panel_wg.get_current_topics()
-
-        # Remove topics that are being streamed
-        streamed_topics = self.get_current_local_topics()
-        current_topics = [
-            topic for topic in current_topics if topic not in streamed_topics
-        ]
+        server_streamed_topics = self.server_topics_panel_wg.get_current_topics()
+        client_streamed_topics = self.client_topics_panel_wg.get_current_topics()
 
         # Delete the topic handlers.
         for topic in list(self.topic_handlers.keys()):
             self.topic_handlers[topic].destroy_subscription()
             del self.topic_handlers[topic]
 
+        # Delete the topic streamers
+        for streamer in self.streamers:
+            self.streamers.remove(streamer)
+            streamer.destroy_subscription()
+
         # Clean the interface
         self.server_topics_list_wg.clear_list()
         self.server_topics_panel_wg.remove_all_topics()
+        self.client_topics_list_wg.clear_list()
+        self.client_topics_panel_wg.remove_all_topics()
 
-        # Configure the interface
-        available_topics = self.client.get_available_topics()
-        for topic in available_topics:
+        # Configure local available topics
+        local_available_topics = self.get_current_local_topics()
+        server_available_topics = self.client.get_available_topics()
+
+        # Configure list with available topics
+        for topic in server_available_topics:
             self.server_topics_list_wg.add_topic(topic)
-        for topic in current_topics:
+        for topic in local_available_topics:
+            self.client_topics_list_wg.add_topic(topic)
+
+        # Add topics to panels
+        for topic in server_streamed_topics:
             self.add_topic_to_panel(topic)
+        for topic in client_streamed_topics:
+            self.add_client_to_panel(topic)
 
     def update_cpu_usage(self):
         """! Update the CPU usage statistic value."""
