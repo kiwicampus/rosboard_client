@@ -332,7 +332,7 @@ class RosboardClientGui(QMainWindow):
         self.setWindowIcon(QIcon(icon_path))
 
         # Start the ROS node
-        self.node = Node("rosboard_desktop_gui")
+        self.node = Node("rosboard_client_gui")
 
         # Initialize network attributes
         self.reset_network_attributes()
