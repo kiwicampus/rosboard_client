@@ -31,7 +31,47 @@ An easy way of running this over the internet is using [`ngrok`](https://ngrok.c
 ```
 ngrok tcp 8888
 ```
-The url that ngrok provides can be used as host for creating the rosboard client
+The url that ngrok provides can be used as host for creating the rosboard client.
+
+## How to use it
+**Note:** Running the rosboard client requires the usage of our own `rosboard` fork running in the server side. This fork provides the required functionalities for the client to work as intended. Some of the functionalities that are available in our fork are:
+- Streaming topics from the client to the server.
+- Streaming of occupancy grids.
+- Checking that QoS profiles are kept when streaming topics.
+
+To use the client, please follow the next steps:
+- Configure a workspace in which you will use the tool e.g. (`~/rosboard_client_ws/`).
+- Clone the repo in your workspace source folder:
+    ```bash
+    $ cd ~/rosboard_client_ws/src/
+    $ git clone git@github.com:kiwicampus/rosboard_client.git # if using SSH
+    # or
+    $ git clone https://github.com/kiwicampus/rosboard_client.git # if using HTTPS
+    ```
+- Navigate to the rosboard package and initialize submodules:
+    ```bash
+    $ cd ~/rosboard_client_ws/src/rosboard_client/
+    $ git submodule update --init --recursive
+    ```
+- Build the package:
+    ```bash
+    $ cd ~/rosboard_client_ws/
+    $ colcon build --symlink-install --packages-up-to rosboard_client
+    ```
+- Source the workspace:
+    ```bash
+    $ source ~/rosboard_client_ws/install/setup.bash
+    ```
+
+By this point you can either run the standalone or the GUI rosboard client nodes:
+```bash
+# To run the standalone node. Remember to configure `topics_to_subscribe.yaml`
+$ ros2 run rosboard_client rosboard_client
+# To run the GUI node.
+$ ros2 run rosboard_client rosboard_client_gui
+```
+
+**Note:** this instructions do not take into account any additional interfaces packages that you require when running the client. Remember to download, build and source those interfaces packages. Not sourced interfaces might prevent topics from streaming. 
 
 ## Rosboard GUI
 This package includes a graphical user interface (GUI) that can be used to connect the local computer (client) to the server. The GUI allows an user to define which topics will be streamed from the server to the client and viceversa. In addition to such capability, the interface presents information related to the rate in which the topic messages are received and the latency of them i.e. the time difference between the message header stamp and the current system time. Finally, some general metrics are presented regarding the CPU usage, average roundtrip time (RTT), and current download speed. This application is intended to ease the streaming process while being capable of dynamically selecting which topics are streamed.
