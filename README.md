@@ -145,22 +145,22 @@ To run the `rosboard` benchmarking, you need to follow the next steps in the ser
 1. Run the [rosboard](https://github.com/kiwicampus/rosboard) node by running `ros2 run rosboard rosboard_node`. You may use the server IP address to connect from the client or forward the port using a third-party tool such as [Ngrok](https://ngrok.com/).
 
 Run the next steps in the client side:
-1. Configure the [`rosboard_config.yaml`](./rosboard_desktop_client/rosboard_desktop_client/benchmarks/rosboard_config.yaml) file with the URL of the server and the topics you want to stream:
+1. Configure the [`rosboard_config.yaml`](./rosboard_client/rosboard_client/benchmarks/rosboard_config.yaml) file with the URL of the server and the topics you want to stream:
     - To configure the URL, set the `url` value in the file.
     - To configure the topics you want to stream *from* the server, configure the topics in the `topics` value in the file.
     - If you want to stream topics *to* the server, configure the `topics_to_stream` value in the file.
-2. Run the `rosboard` benchmark script by executing `ros2 run rosboard_desktop_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
+2. Run the `rosboard` benchmark script by executing `ros2 run rosboard_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
 
 To run the `rosbridge` benchmarking, you need to follow the next steps in the server side:
 1. Run the `ros2 launch rosbridge_server rosbridge_websocket.py`.
 
 Run the next steps in the client side:
-1. Configure the [`rosbridge_config.yaml`](./rosboard_desktop_client/rosboard_desktop_client/benchmarks/rosbridge_config.yaml) file with the topics you want to stream:
+1. Configure the [`rosbridge_config.yaml`](./rosboard_client/rosboard_client/benchmarks/rosbridge_config.yaml) file with the topics you want to stream:
     - Configure the URL in the corresponding field in the YAML file.
     - Add a topic by setting it as a key in the YAML file for the `topics_to_subscribe` entry.
     - Set the message type in the `type` field.
     - Set the compression algorithm in the `compression` field.
-2. Run the `rosbridge` benchmark script by executing `ros2 run rosboard_desktop_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
+2. Run the `rosbridge` benchmark script by executing `ros2 run rosboard_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
 
 **Note:** to run these tests, we used our own `rosboard`, `rosbridge` and `roslibpy` forks. In the case of `rosboard`, our forks allow us to fix an issue regarding ROS2 QoS ([PR](https://github.com/dheera/rosboard/pull/104)) and adding the feature of streaming topics from the client to the server. With regard of `rosbridge`, these forks correct some issues that are present in the main `rosbridge` repository such as allowing the CBOR and PNG compression for images when using ROS2. We strongly recommend using such forks to run the test. The links to our forks are:
 - [`rosboard`](https://github.com/kiwicampus/rosboard): our own `rosboard` fork.
@@ -172,7 +172,7 @@ Run the next steps in the client side:
 
 ### ROS independent usage
 ```.py
-from rosboard_desktop_client.networking import RosboardClient
+from rosboard_client.networking import RosboardClient
 
 def cb(rosboard_data):
     print(f"got data: {rosboard_data}")
@@ -199,8 +199,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 
-from rosboard_desktop_client.republishers import PublisherManager
-from rosboard_desktop_client.networking import RosboardClient
+from rosboard_client.republishers import PublisherManager
+from rosboard_client.networking import RosboardClient
 
 
 class RosboardClientNode(Node):
