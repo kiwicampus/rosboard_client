@@ -3,6 +3,9 @@
 # =============================================================================
 """
 License:
+    Rosboard Client: a client for streaming data from a server using rosboard.
+    Copyright (C) 2022 Kiwibot, Inc. or its Affiliates, Ai&Robotics
+    
     This file is part of Rosboard Client.
 
     Rosboard Client is free software: you can redistribute it and/or modify it
