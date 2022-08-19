@@ -2,6 +2,25 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
 """
+License:
+    Rosboard Client: a client for streaming data from a server using rosboard.
+    Copyright (C) 2022 Kiwibot, Inc. or its Affiliates, Ai&Robotics
+    
+    This file is part of Rosboard Client.
+
+    Rosboard Client is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the Free
+    Software Foundation, either version 3 of the License, or (at your option)
+    any later version.
+
+    Rosboard Client is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.
+
+    You should have received a copy of the GNU General Public License along
+    with Rosboard Client. If not, see <https://www.gnu.org/licenses/>.
+
 Code Information:
     Code Information: PyQt5 user interface for the rosboard client.
     Maintainer: Nicolas Rocha Pacheco
@@ -47,9 +66,9 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QPixmap
 
-from rosboard_desktop_client.streamers import GenericStreamer
-from rosboard_desktop_client.networking import RosboardClient
-from rosboard_desktop_client.republishers import PublisherManager
+from rosboard_client.streamers import GenericStreamer
+from rosboard_client.networking import RosboardClient
+from rosboard_client.republishers import PublisherManager
 
 
 class TopicHandler:
@@ -313,7 +332,7 @@ class RosboardClientGui(QMainWindow):
         self.setWindowIcon(QIcon(icon_path))
 
         # Start the ROS node
-        self.node = Node("rosboard_desktop_gui")
+        self.node = Node("rosboard_client_gui")
 
         # Initialize network attributes
         self.reset_network_attributes()
@@ -1323,7 +1342,7 @@ def main():
     rclpy.init(args=sys.argv)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Rosboard Desktop GUI")
+    app.setApplicationName("Rosboard Client GUI")
     ui = RosboardClientGui()
 
     # Spin node

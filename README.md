@@ -1,5 +1,4 @@
-# Rosboard Desktop Client
-
+# Rosboard Client
 The main objective of this library is to selectively stream ROS topics using websockets from a remote robot to a local machine, allowing to use visualization tools like rviz, rqt, mapviz, etc on live data transmitted over the internet. The library implements a client to use with a [rosboard](https://github.com/kiwicampus/rosboard) server running in the remote robot.
 
 ## Dependencies
@@ -32,7 +31,47 @@ An easy way of running this over the internet is using [`ngrok`](https://ngrok.c
 ```
 ngrok tcp 8888
 ```
-The url that ngrok provides can be used as host for creating the rosboard client
+The url that ngrok provides can be used as host for creating the rosboard client.
+
+## How to use it
+**Note:** Running the rosboard client requires the usage of our own `rosboard` fork running in the server side. This fork provides the required functionalities for the client to work as intended. Some of the functionalities that are available in our fork are:
+- Streaming topics from the client to the server.
+- Streaming of occupancy grids.
+- Checking that QoS profiles are kept when streaming topics.
+
+To use the client, please follow the next steps:
+- Configure a workspace in which you will use the tool e.g. (`~/rosboard_client_ws/`).
+- Clone the repo in your workspace source folder:
+    ```bash
+    $ cd ~/rosboard_client_ws/src/
+    $ git clone git@github.com:kiwicampus/rosboard_client.git # if using SSH
+    # or
+    $ git clone https://github.com/kiwicampus/rosboard_client.git # if using HTTPS
+    ```
+- Navigate to the rosboard package and initialize submodules:
+    ```bash
+    $ cd ~/rosboard_client_ws/src/rosboard_client/
+    $ git submodule update --init --recursive
+    ```
+- Build the package:
+    ```bash
+    $ cd ~/rosboard_client_ws/
+    $ colcon build --symlink-install --packages-up-to rosboard_client
+    ```
+- Source the workspace:
+    ```bash
+    $ source ~/rosboard_client_ws/install/setup.bash
+    ```
+
+By this point you can either run the standalone or the GUI rosboard client nodes:
+```bash
+# To run the standalone node. Remember to configure `topics_to_subscribe.yaml`
+$ ros2 run rosboard_client rosboard_client
+# To run the GUI node.
+$ ros2 run rosboard_client rosboard_client_gui
+```
+
+**Note:** this instructions do not take into account any additional interfaces packages that you require when running the client. Remember to download, build and source those interfaces packages. Not sourced interfaces might prevent topics from streaming. 
 
 ## Rosboard GUI
 This package includes a graphical user interface (GUI) that can be used to connect the local computer (client) to the server. The GUI allows an user to define which topics will be streamed from the server to the client and viceversa. In addition to such capability, the interface presents information related to the rate in which the topic messages are received and the latency of them i.e. the time difference between the message header stamp and the current system time. Finally, some general metrics are presented regarding the CPU usage, average roundtrip time (RTT), and current download speed. This application is intended to ease the streaming process while being capable of dynamically selecting which topics are streamed.
@@ -106,22 +145,22 @@ To run the `rosboard` benchmarking, you need to follow the next steps in the ser
 1. Run the [rosboard](https://github.com/kiwicampus/rosboard) node by running `ros2 run rosboard rosboard_node`. You may use the server IP address to connect from the client or forward the port using a third-party tool such as [Ngrok](https://ngrok.com/).
 
 Run the next steps in the client side:
-1. Configure the [`rosboard_config.yaml`](./rosboard_desktop_client/rosboard_desktop_client/benchmarks/rosboard_config.yaml) file with the URL of the server and the topics you want to stream:
+1. Configure the [`rosboard_config.yaml`](./rosboard_client/rosboard_client/benchmarks/rosboard_config.yaml) file with the URL of the server and the topics you want to stream:
     - To configure the URL, set the `url` value in the file.
     - To configure the topics you want to stream *from* the server, configure the topics in the `topics` value in the file.
     - If you want to stream topics *to* the server, configure the `topics_to_stream` value in the file.
-2. Run the `rosboard` benchmark script by executing `ros2 run rosboard_desktop_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
+2. Run the `rosboard` benchmark script by executing `ros2 run rosboard_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
 
 To run the `rosbridge` benchmarking, you need to follow the next steps in the server side:
 1. Run the `ros2 launch rosbridge_server rosbridge_websocket.py`.
 
 Run the next steps in the client side:
-1. Configure the [`rosbridge_config.yaml`](./rosboard_desktop_client/rosboard_desktop_client/benchmarks/rosbridge_config.yaml) file with the topics you want to stream:
+1. Configure the [`rosbridge_config.yaml`](./rosboard_client/rosboard_client/benchmarks/rosbridge_config.yaml) file with the topics you want to stream:
     - Configure the URL in the corresponding field in the YAML file.
     - Add a topic by setting it as a key in the YAML file for the `topics_to_subscribe` entry.
     - Set the message type in the `type` field.
     - Set the compression algorithm in the `compression` field.
-2. Run the `rosbridge` benchmark script by executing `ros2 run rosboard_desktop_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
+2. Run the `rosbridge` benchmark script by executing `ros2 run rosboard_client rosboard_benchmark`. Let the script run for at least a minute and for it to print the test results in console. You may now exit the script.
 
 **Note:** to run these tests, we used our own `rosboard`, `rosbridge` and `roslibpy` forks. In the case of `rosboard`, our forks allow us to fix an issue regarding ROS2 QoS ([PR](https://github.com/dheera/rosboard/pull/104)) and adding the feature of streaming topics from the client to the server. With regard of `rosbridge`, these forks correct some issues that are present in the main `rosbridge` repository such as allowing the CBOR and PNG compression for images when using ROS2. We strongly recommend using such forks to run the test. The links to our forks are:
 - [`rosboard`](https://github.com/kiwicampus/rosboard): our own `rosboard` fork.
@@ -133,7 +172,7 @@ Run the next steps in the client side:
 
 ### ROS independent usage
 ```.py
-from rosboard_desktop_client.networking import RosboardClient
+from rosboard_client.networking import RosboardClient
 
 def cb(rosboard_data):
     print(f"got data: {rosboard_data}")
@@ -160,8 +199,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 
-from rosboard_desktop_client.republishers import PublisherManager
-from rosboard_desktop_client.networking import RosboardClient
+from rosboard_client.republishers import PublisherManager
+from rosboard_client.networking import RosboardClient
 
 
 class RosboardClientNode(Node):
