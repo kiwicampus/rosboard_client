@@ -30,24 +30,17 @@ Code Information:
 # =============================================================================
 import os
 import re
-import yaml
-import rclpy
-from sys import exit
-from time import time, sleep
 from threading import Thread
-from icmplib import ping, NameLookupError
+from time import sleep, time
+
+import rclpy
+import yaml
 from psutil import net_io_counters
-from socket import gaierror
-
-from rclpy.node import Node
-
 from rclpy.executors import MultiThreadedExecutor
-
-from rosboard_client.rosboard_client.ros.republishers import PublisherManager
-
-from rosboard_client.rosboard_client.ros.streamers import GenericStreamer
-
-from rosboard_client.rosboard_client.client.networking import RosboardClient
+from rclpy.node import Node
+from rosboard_client.client.networking import RosboardClient
+from rosboard_client.ros.republishers import PublisherManager
+from rosboard_client.ros.streamers import GenericStreamer
 
 
 class RosboardBenchmark(Node):

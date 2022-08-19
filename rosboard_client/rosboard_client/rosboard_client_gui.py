@@ -37,7 +37,6 @@ import bisect
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
-from ament_index_python import get_package_prefix
 
 from icmplib import ping, NameLookupError
 from time import time, sleep
@@ -64,11 +63,11 @@ from PyQt5.QtWidgets import (
     QSplitter,
     QCheckBox,
 )
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QIcon
 
-from rosboard_client.rosboard_client.ros.streamers import GenericStreamer
-from rosboard_client.rosboard_client.client.networking import RosboardClient
-from rosboard_client.rosboard_client.ros.republishers import PublisherManager
+from rosboard_client.ros.streamers import GenericStreamer
+from rosboard_client.client.networking import RosboardClient
+from rosboard_client.ros.republishers import PublisherManager
 
 
 class TopicHandler:

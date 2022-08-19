@@ -4,7 +4,7 @@ package_name = "rosboard_client"
 
 setup(
     name=package_name,
-    version="0.0.0",
+    version="1.0.0",
     packages=[package_name],
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
@@ -12,10 +12,10 @@ setup(
     ],
     install_requires=["setuptools"],
     zip_safe=True,
-    maintainer="ada",
+    maintainer="Kiwibot, Inc",
     maintainer_email="pedro.gonzalez@eia.edu.co",
-    description="TODO: Package description",
-    license="TODO: License declaration",
+    description="Package to connect to a rosboard server and republish them locally using ros2",
+    license="GNU v3",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
