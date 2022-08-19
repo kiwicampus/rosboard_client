@@ -67,7 +67,7 @@ from PyQt5.QtGui import QIcon
 
 from rosboard_client.ros.streamers import GenericStreamer
 from rosboard_client.client.networking import RosboardClient
-from rosboard_client.ros.republishers import PublisherManager
+from rosboard_client.ros.republishers.manager import PublisherManager
 
 
 class TopicHandler:
