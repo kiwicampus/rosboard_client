@@ -43,11 +43,11 @@ from rclpy.node import Node
 
 from rclpy.executors import MultiThreadedExecutor
 
-from rosboard_client.republishers import PublisherManager
+from rosboard_client.rosboard_client.ros.republishers import PublisherManager
 
-from rosboard_client.streamers import GenericStreamer
+from rosboard_client.rosboard_client.ros.streamers import GenericStreamer
 
-from rosboard_client.networking import RosboardClient
+from rosboard_client.rosboard_client.client.networking import RosboardClient
 
 
 class RosboardBenchmark(Node):

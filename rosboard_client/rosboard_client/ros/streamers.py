@@ -35,7 +35,7 @@ from rclpy.qos import qos_profile_sensor_data
 from rclpy_message_converter.message_converter import convert_ros_message_to_dictionary
 
 
-from rosboard_client.networking import RosboardClient
+from rosboard_client.rosboard_client.client.networking import RosboardClient
 
 
 class GenericStreamer:
