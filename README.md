@@ -172,7 +172,7 @@ Run the next steps in the client side:
 
 ### ROS independent usage
 ```.py
-from rosboard_client.networking import RosboardClient
+from rosboard_client.client import RosboardClient
 
 def cb(rosboard_data):
     print(f"got data: {rosboard_data}")
@@ -199,8 +199,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 
-from rosboard_client.republishers import PublisherManager
-from rosboard_client.networking import RosboardClient
+from rosboard_client.ros import PublisherManager
+from rosboard_client.client import RosboardClient
 
 
 class RosboardClientNode(Node):
