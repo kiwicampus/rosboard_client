@@ -57,7 +57,7 @@ class RosboardBenchmark(Node):
 
         # Read and parse config file
         config_file_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "benchmark_config.yaml"
+            os.path.dirname(os.path.abspath(__file__)), "rosboard_config.yaml"
         )
         with open(config_file_path, "r") as stream:
             config_dict = yaml.safe_load(stream)
@@ -192,7 +192,7 @@ def main(args=None):
 
     # Execute work and block until the context associated with the
     # executor is shutdown.
-    rosboard_client = RosboardYamlNode()
+    rosboard_client = RosboardBenchmark()
 
     # Runs callbacks in a pool of threads.
     executor = MultiThreadedExecutor()
