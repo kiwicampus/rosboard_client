@@ -28,11 +28,13 @@ Code Information:
 """
 
 # =============================================================================
-from rosboard_client.ros.republishers.generic import GenericPublisher
-from rosboard_client.ros.republishers.image import ImagePublisher
-from rosboard_client.ros.republishers.laser_scan import LaserScanPublisher
-from rosboard_client.ros.republishers.occupancy_grid import OccupancyGridPublisher
-from rosboard_client.ros.republishers.point_cloud import PointCloudPublisher
+from rosboard_client.ros.republishers import (
+    GenericPublisher,
+    ImagePublisher,
+    LaserScanPublisher,
+    OccupancyGridPublisher,
+    PointCloudPublisher,
+)
 
 
 class PublisherManager:

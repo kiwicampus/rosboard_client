@@ -1,2 +1,2 @@
 from .streamers import GenericStreamer
-from .republishers.manager import PublisherManager
+from .republisher_manager import PublisherManager
