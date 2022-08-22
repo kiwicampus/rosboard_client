@@ -30,24 +30,16 @@ Code Information:
 # =============================================================================
 import os
 import re
-import yaml
-import rclpy
-from sys import exit
-from time import time, sleep
 from threading import Thread
-from icmplib import ping, NameLookupError
+from time import sleep, time
+
+import rclpy
+import yaml
 from psutil import net_io_counters
-from socket import gaierror
-
-from rclpy.node import Node
-
 from rclpy.executors import MultiThreadedExecutor
-
-from rosboard_client.republishers import PublisherManager
-
-from rosboard_client.streamers import GenericStreamer
-
-from rosboard_client.networking import RosboardClient
+from rclpy.node import Node
+from rosboard_client.client import RosboardClient
+from rosboard_client.ros import GenericStreamer, PublisherManager
 
 
 class RosboardBenchmark(Node):
@@ -64,7 +56,7 @@ class RosboardBenchmark(Node):
 
         # Read and parse config file
         config_file_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "benchmark_config.yaml"
+            os.path.dirname(os.path.abspath(__file__)), "rosboard_config.yaml"
         )
         with open(config_file_path, "r") as stream:
             config_dict = yaml.safe_load(stream)
@@ -74,7 +66,7 @@ class RosboardBenchmark(Node):
 
         self.client = RosboardClient(host=self.host, connection_timeout=5)
 
-        match = re.search(RosboardYamlNode.URL_RE, self.host)
+        match = re.search(RosboardBenchmark.URL_RE, self.host)
         self.host_addr = match.group("host")
 
         # Topic handler list attribute
@@ -199,7 +191,7 @@ def main(args=None):
 
     # Execute work and block until the context associated with the
     # executor is shutdown.
-    rosboard_client = RosboardYamlNode()
+    rosboard_client = RosboardBenchmark()
 
     # Runs callbacks in a pool of threads.
     executor = MultiThreadedExecutor()

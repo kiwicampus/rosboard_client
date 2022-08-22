@@ -27,48 +27,45 @@ Code Information:
 	Mail: nicolas.rocha@kiwibot.com
 """
 
+import bisect
+
 # =============================================================================
 import os
 import re
 import sys
-from typing import Tuple
-import bisect
-
-import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-from ament_index_python import get_package_prefix
-
-from icmplib import ping, NameLookupError
-from time import time, sleep
-from threading import Thread
-from psutil import cpu_percent, net_io_counters
-from socket import socket, AF_INET, SOCK_STREAM, gaierror
-
 from functools import partial
+from socket import AF_INET, SOCK_STREAM, gaierror, socket
+from threading import Thread
+from time import sleep, time
+from typing import Tuple
+
 import PyQt5
+import rclpy
+from icmplib import NameLookupError, ping
+from psutil import cpu_percent, net_io_counters
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
-    QMainWindow,
     QApplication,
-    QWidget,
-    QLabel,
-    QHBoxLayout,
-    QVBoxLayout,
+    QCheckBox,
     QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QLineEdit,
+    QMainWindow,
+    QMessageBox,
     QPushButton,
     QScrollArea,
-    QGroupBox,
-    QMessageBox,
     QSplitter,
-    QCheckBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtGui import QIcon, QPixmap
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.node import Node
 
-from rosboard_client.streamers import GenericStreamer
-from rosboard_client.networking import RosboardClient
-from rosboard_client.republishers import PublisherManager
+from rosboard_client.client import RosboardClient
+from rosboard_client.ros import GenericStreamer, PublisherManager
 
 
 class TopicHandler:

@@ -29,17 +29,14 @@ Code Information:
 
 # =============================================================================
 import os
-import yaml
+
 import rclpy
+import yaml
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
-from rclpy.executors import MultiThreadedExecutor
-
-from rosboard_client.republishers import PublisherManager
-
-from rosboard_client.streamers import GenericStreamer
-
-from rosboard_client.networking import RosboardClient
+from rosboard_client.client import RosboardClient
+from rosboard_client.ros import GenericStreamer, PublisherManager
 
 
 class RosboardYamlNode(Node):

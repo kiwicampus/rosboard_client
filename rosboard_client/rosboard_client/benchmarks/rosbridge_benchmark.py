@@ -26,21 +26,18 @@ Code Information:
     Maintainer: Eng. Pedro Alejandro Gonzalez B
 	Mail: pedro@kiwibot.com
 """
-
 # =============================================================================
-from threading import Thread
-from grpc import Compression
-import yaml
-import std_msgs.msg, sensor_msgs.msg, nav_msgs.msg, geometry_msgs.msg
+import os
 import sys
+from threading import Thread
+from time import sleep, time
+
 import rclpy
+import yaml
 from psutil import net_io_counters
-from time import time, sleep
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-import os
 from rclpy_message_converter import message_converter
-import copy
 
 # sys.path.insert(1, "<path_to_roslibpy>/roslibpy/src")
 sys.path.insert(1, "/workspace/rover/ros2/src/roslibpy/src")
