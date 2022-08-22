@@ -39,7 +39,6 @@ from psutil import net_io_counters
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rosboard_client.client import RosboardClient
-from rosboard_client.client.client import RosboardClient
 from rosboard_client.ros import GenericStreamer, PublisherManager
 
 
