@@ -33,7 +33,7 @@ import logging
 
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
-
+from rclpy_message_converter.message_converter import convert_dictionary_to_ros_message
 
 tf_static_qos = QoSProfile(
     depth=10,
@@ -94,3 +94,39 @@ class GenericPublisher:
         self.publisher = parent_node.create_publisher(
             msg_type=self.topic_class, topic=topic_name, qos_profile=qos_profile
         )
+
+    def publish(self, msg: any) -> None:
+        """!
+        Function to publish ros messages on the specified topic
+        @param msg (any) The message to publish
+        """
+        if not isinstance(msg, self.topic_class):
+            self.logger.error(
+                f"tried to publish a message of type {type(msg).__name__} while a publisher was created for type {self.topic_class_name}"
+            )
+            return
+        if self.publisher is None:
+            self.logger.error(f"tried to publish message but no node was provided")
+            return
+        self.publisher.publish(msg)
+
+    def parse_and_publish(self, rosboard_data: list) -> None:
+        """!
+        Function to parse a message from rosboard data and publish it
+        @param rosboard_data (list) the data from rosboard. the binary fields must have already been decoded
+        """
+        self.publish(self.parse_message(rosboard_data))
+
+    def parse_message(self, rosboard_data: list) -> list:
+        """!
+        Function to convert the rosboard data to a ROS message. If a field in the message
+        is not contained in the rosboard data it will be left empty on the ROS message
+        @param rosboard_data (list) The rosboard data, the binary fields must have already been decoded
+        @return any The ROS message
+        """
+        # Make use of rclpy message converter. with strict_mode=False fields not present
+        # in the dictionary will be left empty on the ROS message
+        message = convert_dictionary_to_ros_message(
+            self.topic_class_name.replace(".", "/"), rosboard_data[1], strict_mode=False
+        )
+        return message
