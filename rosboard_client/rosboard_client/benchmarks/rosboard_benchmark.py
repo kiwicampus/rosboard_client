@@ -67,7 +67,7 @@ class RosboardBenchmark(Node):
 
         self.client = RosboardClient(host=self.host, connection_timeout=5)
 
-        match = re.search(RosboardYamlNode.URL_RE, self.host)
+        match = re.search(RosboardBenchmark.URL_RE, self.host)
         self.host_addr = match.group("host")
 
         # Topic handler list attribute
