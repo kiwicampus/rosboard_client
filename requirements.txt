@@ -1,0 +1,8 @@
+autobahn==23.6.2
+icmplib~=3.0.3
+numpy==1.21.5
+opencv-python~=4.6.0
+psutil==5.8.0
+PyQt5~=5.15.6
+simplejpeg~=1.6.3
+twisted~=23.10.0
