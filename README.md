@@ -48,7 +48,7 @@ To use the client, please follow the next steps:
     # or
     $ git clone https://github.com/kiwicampus/rosboard_client.git # if using HTTPS
     ```
-- Navigate to the rosboard package and initialize submodules and requirements:
+- Navigate to the rosboard package and initialize submodules and install requirements:
     ```bash
     $ cd ~/rosboard_client_ws/src/rosboard_client/
     $ git submodule update --init --recursive
