@@ -253,6 +253,26 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self._age_guard_ttl_s = float(os.getenv("WS_TTL_S", "300"))
         self._age_guard_margin_s = float(os.getenv("WS_TTL_MARGIN_S", "30"))
 
+        # Logging toggles for health and keepalive diagnostics
+        # Defaults: disabled (set to 1 to enable)
+        try:
+            self._log_health_enabled = int(os.getenv("WS_LOG_HEALTH", "0")) == 1
+        except Exception:
+            self._log_health_enabled = True
+        try:
+            self._log_keepalive_enabled = int(os.getenv("WS_LOG_KEEPALIVE", "0")) == 1
+        except Exception:
+            self._log_keepalive_enabled = True
+        # Optional global override for both toggles
+        _global_diag = os.getenv("WS_LOG_CONN_DIAG")
+        if _global_diag is not None:
+            try:
+                _enabled = int(_global_diag) == 1
+                self._log_health_enabled = _enabled
+                self._log_keepalive_enabled = _enabled
+            except Exception:
+                pass
+
         # Define the socket URL
         if host.startswith("ws://"):
             socket_url = host + "/rosboard/v1"
@@ -357,13 +377,16 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         @param interval_s float seconds between health logs
         """
         try:
+            if not self._log_health_enabled:
+                return
             if self._health_log is None:
                 self._health_log = LoopingCall(self._log_connection_health)
             if not self._health_log.running:
                 self._health_log.start(interval_s, now=False)
-                self.logger.info(
-                    f"Conn health logging started interval={interval_s}s"
-                )
+                if self._log_health_enabled:
+                    self.logger.info(
+                        f"Conn health logging started interval={interval_s}s"
+                    )
         except Exception as e:
             self.logger.warning(f"Could not start conn health logging: {e}")
 
@@ -424,9 +447,10 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             rx_age_s = f"{last_rx_age:.1f}s" if last_rx_age is not None else "NA"
             tx_age_s = f"{last_tx_age:.1f}s" if last_tx_age is not None else "NA"
 
-            self.logger.info(
-                f"Conn health: age={conn_age_s} rx_age={rx_age_s} tx_age={tx_age_s} subs={subs_count}"
-            )
+            if self._log_health_enabled:
+                self.logger.info(
+                    f"Conn health: age={conn_age_s} rx_age={rx_age_s} tx_age={tx_age_s} subs={subs_count}"
+                )
         except Exception as e:
             self.logger.warning(f"Conn health log failed: {e}")
 
@@ -449,10 +473,11 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             self._proto.send_message(payload)
             self._last_tx_time = time.time()
         except Exception as e:
-            try:
-                self.logger.debug(f"App ping failed (ignored): {e}")
-            except Exception:
-                pass
+            if self._log_keepalive_enabled:
+                try:
+                    self.logger.debug(f"App ping failed (ignored): {e}")
+                except Exception:
+                    pass
 
     def start_app_keepalive(self, interval_s: float = None) -> None:
         """Start periodic application-level keepalive pings."""
@@ -462,7 +487,8 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
                 self._app_keepalive = LoopingCall(self._send_app_ping)
             if not self._app_keepalive.running:
                 self._app_keepalive.start(interval, now=False)
-                self.logger.info(f"App keepalive started interval={interval}s")
+                if self._log_keepalive_enabled:
+                    self.logger.info(f"App keepalive started interval={interval}s")
         except Exception as e:
             self.logger.warning(f"Could not start app keepalive: {e}")
 
@@ -471,7 +497,8 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         try:
             if self._app_keepalive is not None and self._app_keepalive.running:
                 self._app_keepalive.stop()
-                self.logger.info("App keepalive stopped")
+                if self._log_keepalive_enabled:
+                    self.logger.info("App keepalive stopped")
         except Exception as e:
             self.logger.warning(f"Could not stop app keepalive: {e}")
 

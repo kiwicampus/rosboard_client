@@ -74,6 +74,27 @@ $ ros2 run rosboard_client rosboard_client_gui
 
 **Note:** this instructions do not take into account any additional interfaces packages that you require when running the client. Remember to download, build and source those interfaces packages. Not sourced interfaces might prevent topics from streaming. 
 
+### Logging configuration (health and keepalive)
+
+You can control the verbosity of connection diagnostics via environment variables. These flags only affect logging; the underlying features remain active (keepalive pings and reconnection logic are not disabled). By default, these logs are disabled.
+
+- WS_LOG_HEALTH: Enable/disable periodic connection health logs. Default: 0 (disabled). Set to 1 to enable.
+- WS_LOG_KEEPALIVE: Enable/disable application-level keepalive logs (start/stop and ping failures). Default: 0 (disabled). Set to 1 to enable.
+- WS_LOG_CONN_DIAG: Optional global override for both toggles. When set, it forces both to the same value (1 or 0), regardless of the specific flags above.
+
+Examples:
+
+```bash
+# Enable both health and keepalive logs
+export WS_LOG_CONN_DIAG=1
+
+# Or configure them independently
+export WS_LOG_HEALTH=1      # periodic health log lines enabled
+export WS_LOG_KEEPALIVE=1   # keepalive start/stop and ping failure logs enabled
+```
+
+Note: These variables can be set in your shell/session or in your service manager (e.g., systemd) before launching the client.
+
 ## Rosboard GUI
 This package includes a graphical user interface (GUI) that can be used to connect the local computer (client) to the server. The GUI allows an user to define which topics will be streamed from the server to the client and viceversa. In addition to such capability, the interface presents information related to the rate in which the topic messages are received and the latency of them i.e. the time difference between the message header stamp and the current system time. Finally, some general metrics are presented regarding the CPU usage, average roundtrip time (RTT), and current download speed. This application is intended to ease the streaming process while being capable of dynamically selecting which topics are streamed.
 
