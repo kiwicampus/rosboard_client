@@ -247,11 +247,11 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             os.getenv("WS_APP_KEEPALIVE_S", "25")
         )
         self._age_guard = None
-        self._age_guard_interval = float(os.getenv("WS_AGE_GUARD_S", "30"))
+        self._age_guard_interval = float(os.getenv("WS_AGE_GUARD_S", "20"))
         # Refresh before TTL: reconnect proactively if connection age exceeds threshold
         # Default: 300s (5min) minus a safety margin of 30s
-        self._age_guard_ttl_s = float(os.getenv("WS_TTL_S", "300"))
-        self._age_guard_margin_s = float(os.getenv("WS_TTL_MARGIN_S", "30"))
+        self._age_guard_ttl_s = float(os.getenv("WS_TTL_S", "240"))
+        self._age_guard_margin_s = float(os.getenv("WS_TTL_MARGIN_S", "60"))
 
         # Define the socket URL
         if host.startswith("ws://"):
