@@ -29,6 +29,7 @@ Code Information:
 # =============================================================================
 
 import json
+import os
 import logging
 import threading
 import time
@@ -42,6 +43,7 @@ from rosboard_client.client.decoders import RosboardDecoder
 from twisted.internet import reactor
 from twisted.internet.error import ReactorAlreadyRunning, ReactorNotRunning
 from twisted.internet.protocol import ReconnectingClientFactory
+from twisted.internet.task import LoopingCall
 
 logging.basicConfig(level=logging.INFO)
 
@@ -90,16 +92,56 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         RosboardClientProtocol.is_connected = True
         self.factory.logger.info(f"Communication opened")
         self.factory.ready(self)
-        # Connection ready
+        # Track connection open time and increment reconnect counter
+        try:
+            self.factory._open_time = time.time()
+            self.factory._reconnect_count += 1
+            self.factory.logger.info(
+                f"Conn opened: reconnects={self.factory._reconnect_count}"
+            )
+            # Start periodic health logging (every 60s)
+            self.factory.start_health_logging(60.0)
+        except Exception:
+            pass
 
     def onClose(self, wasClean, code, reason) -> None:
         """!
         Function run when the connection is closed
         """
         RosboardClientProtocol.is_connected = False
-        self.factory.logger.warning(
-            f"Communication closed. reason: {reason} was clean: {wasClean}, code: {code}"
-        )
+        # Log extended connection stats to help detect patterns
+        try:
+            now = time.time()
+            open_time = getattr(self.factory, "_open_time", None)
+            last_rx_time = getattr(self.factory, "_last_rx_time", None)
+            last_tx_time = getattr(self.factory, "_last_tx_time", None)
+            conn_age = (now - open_time) if open_time else None
+            last_rx_age = (now - last_rx_time) if last_rx_time else None
+            last_tx_age = (now - last_tx_time) if last_tx_time else None
+            subs_count = len(getattr(self.factory, "socket_subscriptions", {}))
+            # Store event snapshot
+            event = {
+                "ts": now,
+                "wasClean": wasClean,
+                "code": code,
+                "reason": f"{reason}",
+                "conn_age_s": conn_age,
+                "last_rx_age_s": last_rx_age,
+                "last_tx_age_s": last_tx_age,
+                "subs": subs_count,
+            }
+            getattr(self.factory, "_close_events", []).append(event)
+            self.factory.logger.warning(
+                f"Communication closed. reason: {reason} was clean: {wasClean}, code: {code}"
+            )
+            self.factory.logger.info(
+                f"Conn stats at close: age={conn_age:.1f}s rx_age={last_rx_age:.1f}s tx_age={last_tx_age:.1f}s subs={subs_count}"
+            )
+        except Exception:
+            # Fallback to original log if any formatting fails
+            self.factory.logger.warning(
+                f"Communication closed. reason: {reason} was clean: {wasClean}, code: {code}"
+            )
 
     def onMessage(self, payload, isBinary) -> None:
         """!
@@ -111,25 +153,41 @@ class RosboardClientProtocol(WebSocketClientProtocol):
         """
         if not isBinary:
             data = json.loads(payload.decode("utf8"))
+            # Track last RX time
+            try:
+                self.factory._last_rx_time = time.time()
+            except Exception:
+                pass
 
         # rosboard messages are list with the following structure: [_identifier_, {_field1_: _value1_, ...}]
         # Identifiers are contained in the WebsocketV1Transport class
         # Respond to server ping to avoid server-side session timeouts
         if data[0] == WebsocketV1Transport.MSG_PING:
-            now_ms = int(time.time() * 1000)
-            seq = 0
-            if isinstance(data[1], dict) and WebsocketV1Transport.PING_SEQ in data[1]:
-                seq = data[1][WebsocketV1Transport.PING_SEQ]
-            pong = json.dumps(
-                [
-                    WebsocketV1Transport.MSG_PONG,
-                    {
-                        WebsocketV1Transport.PONG_SEQ: seq,
-                        WebsocketV1Transport.PONG_TIME: now_ms,
-                    },
-                ]
-            ).encode("utf-8")
-            self.sendMessage(pong, isBinary=False)
+            try:
+                now_ms = int(time.time() * 1000)
+                seq = 0
+                if isinstance(data[1], dict) and WebsocketV1Transport.PING_SEQ in data[1]:
+                    seq = data[1][WebsocketV1Transport.PING_SEQ]
+                pong = json.dumps(
+                    [
+                        WebsocketV1Transport.MSG_PONG,
+                        {
+                            WebsocketV1Transport.PONG_SEQ: seq,
+                            WebsocketV1Transport.PONG_TIME: now_ms,
+                        },
+                    ]
+                ).encode("utf-8")
+                # We are already in reactor thread
+                self.sendMessage(pong, isBinary=False)
+                try:
+                    self.factory._last_tx_time = time.time()
+                except Exception:
+                    pass
+            except Exception as e:
+                try:
+                    self.factory.logger.debug(f"Failed to send PONG: {e}")
+                except Exception:
+                    pass
             return
 
         # In case the information received contains a ros message
@@ -177,7 +235,23 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         self.is_connected = False
         self.socket_subscriptions = {}
         self.available_topics = {}
-        # Minimal state tracking only
+        # Telemetry for debugging connection patterns
+        self._open_time = None
+        self._last_rx_time = None
+        self._last_tx_time = None
+        self._reconnect_count = -1  # will become 0 on first open
+        self._close_events = []
+        self._health_log = None
+        self._app_keepalive = None
+        self._app_keepalive_interval = float(
+            os.getenv("WS_APP_KEEPALIVE_S", "25")
+        )
+        self._age_guard = None
+        self._age_guard_interval = float(os.getenv("WS_AGE_GUARD_S", "30"))
+        # Refresh before TTL: reconnect proactively if connection age exceeds threshold
+        # Default: 300s (5min) minus a safety margin of 30s
+        self._age_guard_ttl_s = float(os.getenv("WS_TTL_S", "300"))
+        self._age_guard_margin_s = float(os.getenv("WS_TTL_MARGIN_S", "30"))
 
         # Define the socket URL
         if host.startswith("ws://"):
@@ -200,14 +274,14 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
             # If value can not be parsed to int, use port 80
             except ValueError:
                 port = 80
-                self.logger.warning(
+                self.logger.warn(
                     "Could not parse port passed to rosboard client. Using port 80 as default."
                 )
 
             # Add generic exception to prevent errors
             except Exception:
                 port = 80
-                self.logger.warning(
+                self.logger.warn(
                     "There was an error while trying to get port. Using port 80 as default."
                 )
 
@@ -228,7 +302,9 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
                 autoPingTimeout=10,
                 autoPingPayload=b"rb",
             )
-        except (AttributeError, TypeError):
+        except Exception:
+            # If the underlying Autobahn version does not support these options,
+            # proceed without failing hard; reconnection logic will still work
             pass
         self.connector = connectWS(self, timeout=connection_timeout)
 
@@ -275,7 +351,129 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         except ReactorNotRunning as e:
             self.logger.warning("Reactor not stopped as it was not running.")
 
-    
+    def start_health_logging(self, interval_s: float = 60.0) -> None:
+        """Start periodic connection health logging.
+
+        @param interval_s float seconds between health logs
+        """
+        try:
+            if self._health_log is None:
+                self._health_log = LoopingCall(self._log_connection_health)
+            if not self._health_log.running:
+                self._health_log.start(interval_s, now=False)
+                self.logger.info(
+                    f"Conn health logging started interval={interval_s}s"
+                )
+        except Exception as e:
+            self.logger.warning(f"Could not start conn health logging: {e}")
+
+    def _should_refresh_for_age(self) -> bool:
+        try:
+            if self._open_time is None:
+                return False
+            conn_age = time.time() - self._open_time
+            return conn_age >= max(0.0, self._age_guard_ttl_s - self._age_guard_margin_s)
+        except Exception:
+            return False
+
+    def _age_guard_check(self) -> None:
+        """Check connection age and proactively refresh if near TTL."""
+        try:
+            if self._proto is None:
+                return
+            if self._should_refresh_for_age():
+                self.logger.info("Age guard: refreshing WebSocket connection before TTL")
+                try:
+                    # Close with normal code; reconnection factory will reopen
+                    self._proto.sendClose(code=1000, reason=b"refresh")
+                except Exception:
+                    pass
+        except Exception as e:
+            self.logger.debug(f"Age guard check failed (ignored): {e}")
+
+    def start_age_guard(self, interval_s: float = None) -> None:
+        try:
+            interval = interval_s or self._age_guard_interval
+            if self._age_guard is None:
+                self._age_guard = LoopingCall(self._age_guard_check)
+            if not self._age_guard.running:
+                self._age_guard.start(interval, now=False)
+                self.logger.info(f"Age guard started interval={interval}s")
+        except Exception as e:
+            self.logger.warning(f"Could not start age guard: {e}")
+
+    def stop_age_guard(self) -> None:
+        try:
+            if self._age_guard is not None and self._age_guard.running:
+                self._age_guard.stop()
+                self.logger.info("Age guard stopped")
+        except Exception as e:
+            self.logger.warning(f"Could not stop age guard: {e}")
+
+    def _log_connection_health(self) -> None:
+        """Log current connection age and last RX/TX ages to help detect patterns."""
+        try:
+            now = time.time()
+            open_time = self._open_time
+            conn_age = (now - open_time) if open_time else None
+            last_rx_age = (now - self._last_rx_time) if self._last_rx_time else None
+            last_tx_age = (now - self._last_tx_time) if self._last_tx_time else None
+            subs_count = len(self.socket_subscriptions)
+
+            conn_age_s = f"{conn_age:.1f}s" if conn_age is not None else "NA"
+            rx_age_s = f"{last_rx_age:.1f}s" if last_rx_age is not None else "NA"
+            tx_age_s = f"{last_tx_age:.1f}s" if last_tx_age is not None else "NA"
+
+            self.logger.info(
+                f"Conn health: age={conn_age_s} rx_age={rx_age_s} tx_age={tx_age_s} subs={subs_count}"
+            )
+        except Exception as e:
+            self.logger.warning(f"Conn health log failed: {e}")
+
+    def _send_app_ping(self) -> None:
+        """Send an application-level ping to keep proxies/tunnels from idling out.
+
+        Uses the rosboard wire format: ["p", {"s": <seq>, "t": <epoch_ms>}].
+        Safe to call even if protocol is not ready.
+        """
+        try:
+            if self._proto is None:
+                return
+            now_ms = int(time.time() * 1000)
+            payload = json.dumps(
+                [
+                    WebsocketV1Transport.MSG_PING,
+                    {WebsocketV1Transport.PING_SEQ: 0, WebsocketV1Transport.PONG_TIME: now_ms},
+                ]
+            ).encode("utf-8")
+            self._proto.send_message(payload)
+            self._last_tx_time = time.time()
+        except Exception as e:
+            try:
+                self.logger.debug(f"App ping failed (ignored): {e}")
+            except Exception:
+                pass
+
+    def start_app_keepalive(self, interval_s: float = None) -> None:
+        """Start periodic application-level keepalive pings."""
+        try:
+            interval = interval_s or self._app_keepalive_interval
+            if self._app_keepalive is None:
+                self._app_keepalive = LoopingCall(self._send_app_ping)
+            if not self._app_keepalive.running:
+                self._app_keepalive.start(interval, now=False)
+                self.logger.info(f"App keepalive started interval={interval}s")
+        except Exception as e:
+            self.logger.warning(f"Could not start app keepalive: {e}")
+
+    def stop_app_keepalive(self) -> None:
+        """Stop periodic application-level keepalive pings."""
+        try:
+            if self._app_keepalive is not None and self._app_keepalive.running:
+                self._app_keepalive.stop()
+                self.logger.info("App keepalive stopped")
+        except Exception as e:
+            self.logger.warning(f"Could not stop app keepalive: {e}")
 
     def create_socket_subscription(self, msg_type: str, topic: str, callback) -> None:
         """! Function to subscribe to a topic available in the rosboard server
@@ -291,6 +489,11 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
                 "utf-8"
             ),
         )
+        # Track last TX time
+        try:
+            self._last_tx_time = time.time()
+        except Exception:
+            pass
 
     def destroy_socket_subscription(self, topic_name: str):
         """! Function to unsubscribe to a topic
@@ -312,6 +515,10 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
                 [WebsocketV1Transport.MSG_UNSUB, {"topicName": topic_name}]
             ).encode("utf-8"),
         )
+        try:
+            self._last_tx_time = time.time()
+        except Exception:
+            pass
 
     def destroy_socket_publisher(self, topic_name: str):
         """! Function to destroy publisher of a topic in server.
@@ -325,6 +532,10 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
                 [WebsocketV1Transport().MSG_UNPUB, {"topicName": topic_name}]
             ).encode("utf-8"),
         )
+        try:
+            self._last_tx_time = time.time()
+        except Exception:
+            pass
 
     def send_ros_message(self, ros_message_dict: dict) -> None:
         """!
@@ -340,6 +551,10 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
                 "utf-8"
             ),
         )
+        try:
+            self._last_tx_time = time.time()
+        except Exception:
+            pass
 
     def ready(self, proto: WebSocketClientFactory) -> None:
         """!
@@ -349,7 +564,10 @@ class RosboardClient(ReconnectingClientFactory, WebSocketClientFactory):
         """
         ReconnectingClientFactory.resetDelay(self)
         self._proto = proto
-        # Protocol ready
+        # Start application-level keepalive once socket is ready
+        self.start_app_keepalive()
+        # Start age guard to refresh before TTLs
+        self.start_age_guard()
 
     def set_available_topics(self, topics: dict) -> None:
         """! Function to set the available topics in the client
