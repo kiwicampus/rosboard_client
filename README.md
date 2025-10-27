@@ -74,6 +74,8 @@ $ ros2 run rosboard_client rosboard_client_gui
 
 **Note:** this instructions do not take into account any additional interfaces packages that you require when running the client. Remember to download, build and source those interfaces packages. Not sourced interfaces might prevent topics from streaming. 
 
+ 
+
 ## Rosboard GUI
 This package includes a graphical user interface (GUI) that can be used to connect the local computer (client) to the server. The GUI allows an user to define which topics will be streamed from the server to the client and viceversa. In addition to such capability, the interface presents information related to the rate in which the topic messages are received and the latency of them i.e. the time difference between the message header stamp and the current system time. Finally, some general metrics are presented regarding the CPU usage, average roundtrip time (RTT), and current download speed. This application is intended to ease the streaming process while being capable of dynamically selecting which topics are streamed.
 
