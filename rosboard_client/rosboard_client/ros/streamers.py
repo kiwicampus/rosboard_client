@@ -29,6 +29,7 @@ Code Information:
 
 # =============================================================================
 import importlib
+import threading
 
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -58,6 +59,10 @@ class GenericStreamer:
         self.topic_name = topic_name
         self.topic_type = topic_type
         self.subscriber = None
+        self._lock = threading.RLock()
+        self._destroyed = False
+        self.sent_messages = 0
+        self.dropped_messages = 0
         self.logger = self.parent_node.get_logger()
         self.create_subscription(topic_name, topic_type)
         self.logger.info(f"Subscription to topic {topic_name} created successfully")
@@ -70,9 +75,16 @@ class GenericStreamer:
         Raises:
             Exception: in case that the subscription exists and can not be destroyed.
         """
+        with self._lock:
+            if self._destroyed:
+                return
+            self._destroyed = True
+            subscriber = self.subscriber
+            self.subscriber = None
+
         self.parent_rosboard_client.destroy_socket_publisher(self.topic_name)
-        if self.subscriber is not None:
-            if not self.parent_node.destroy_subscription(self.subscriber):
+        if subscriber is not None:
+            if not self.parent_node.destroy_subscription(subscriber):
                 raise Exception(
                     f"Could not destroy subscription to {self.topic_name} topic!"
                 )
@@ -141,7 +153,15 @@ class GenericStreamer:
         Function to send a ROS message to a remote rosboard server
         @param msg (any) the ROS message
         """
+        with self._lock:
+            if self._destroyed:
+                return
         msg_dict = convert_ros_message_to_dictionary(msg)
         msg_dict["_topic_name"] = self.topic_name
         msg_dict["_topic_type"] = self.topic_type
-        self.parent_rosboard_client.send_ros_message(msg_dict)
+        if self.parent_rosboard_client.send_ros_message(msg_dict):
+            self.sent_messages += 1
+        else:
+            # Do not queue commands while reconnecting.  Replaying an old
+            # motion/arm request when the socket returns would be unsafe.
+            self.dropped_messages += 1

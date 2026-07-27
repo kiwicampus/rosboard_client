@@ -449,9 +449,8 @@ class RosboardClientGui(QMainWindow):
     def closeEvent(self, event: PyQt5.QtGui.QCloseEvent):
         """! Function for handling the close interface event."""
         if self.client is not None:
-            self.client.stop_reactor()
-            if self.client.protocol.is_connected:
-                self.disconnect_from_server()
+            self.disconnect_from_server()
+        RosboardClient.shutdown_reactor()
         self.stop_threads = True
         super(QMainWindow, self).closeEvent(event)
 
@@ -547,9 +546,8 @@ class RosboardClientGui(QMainWindow):
         interface if a reconnection is found to take place.
         """
         if self.client is not None:
-            self.is_connected = self.client.protocol.is_connected
+            self.is_connected = self.client.is_connected
             if self.retry_connection and self.is_connected:
-                self.restore_interface()
                 self.retry_connection = False
                 self.connection_widget.set_status_label("CONNECTED")
             if self.retry_connection and not self.is_connected:
@@ -606,7 +604,7 @@ class RosboardClientGui(QMainWindow):
     def update_roundtrip(self):
         """! Update the roundtrip response time value."""
         if self.client is not None:
-            if self.client.protocol.is_connected:
+            if self.client.is_connected:
                 try:
                     ping_response = ping(
                         address=self.server_ip_addr,
@@ -655,7 +653,7 @@ class RosboardClientGui(QMainWindow):
         panel, it will not be removed.
         """
         # Check if the client is connected to the server
-        if self.client.protocol.is_connected:
+        if self.client is not None and self.client.is_connected:
 
             # Get the server and client available topics
             server_current_topics = self.client.get_available_topics()
@@ -843,6 +841,16 @@ class RosboardClientGui(QMainWindow):
         for topic in list(self.topic_handlers.keys()):
             self.topic_handlers[topic].destroy_subscription()
             del self.topic_handlers[topic]
+
+        for streamer in list(self.streamers):
+            try:
+                streamer.destroy_subscription()
+            finally:
+                self.streamers.remove(streamer)
+
+        client = self.client
+        if client is not None:
+            client.close()
 
         # Reset the interface network attributes
         self.reset_network_attributes()
